@@ -16,6 +16,7 @@ import {
   ShieldAlert,
   Loader2,
   BookOpen,
+  AlertTriangle,
 } from 'lucide-react';
 import { NewSale } from './components/NewSale';
 import { SalesHistory } from './components/SalesHistory';
@@ -24,7 +25,7 @@ import { CompanySettings } from './components/CompanySettings';
 import { UserManagement } from './components/UserManagement';
 import { AuthPage } from './components/AuthPage';
 import { Comptabilite } from './components/Comptabilite';
-import { supabase } from './lib/supabase';
+import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { CompanyProfile, UserProfile, UserRole } from './types';
 
 type Tab = 'sale' | 'history' | 'prices' | 'company' | 'users' | 'accounting';
@@ -48,6 +49,7 @@ const ROLE_COLOR: Record<UserRole, string> = {
 };
 
 export default function App() {
+  // All hooks must come before any conditional return
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('sale');
@@ -56,22 +58,18 @@ export default function App() {
   const [profiles, setProfiles] = useState<CompanyProfile[]>([]);
   const [defaultProfile, setDefaultProfile] = useState<CompanyProfile | null>(null);
 
-  // Init session
   useEffect(() => {
+    if (!isSupabaseConfigured) return;
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setSession(session);
-      if (!session) {
-        setUserProfile(null);
-      }
+      if (!session) setUserProfile(null);
     });
     return () => subscription.unsubscribe();
   }, []);
 
-  // Load user profile when session changes
   useEffect(() => {
     if (!session?.user) return;
     (async () => {
@@ -81,7 +79,6 @@ export default function App() {
         .eq('id', session.user.id)
         .maybeSingle();
       setUserProfile(data);
-      // Reset tab to first allowed if current tab not allowed
       if (data) {
         const allowed = ROLE_TABS[data.role];
         setActiveTab((prev) => (allowed.includes(prev) ? prev : allowed[0]));
@@ -89,7 +86,6 @@ export default function App() {
     })();
   }, [session]);
 
-  // Load company profiles
   useEffect(() => {
     if (!session) return;
     fetchCompanyProfiles();
@@ -115,7 +111,30 @@ export default function App() {
     setShowUserMenu(false);
   }
 
-  // Loading state (session not yet determined)
+  // Missing secrets (GitHub Pages without secrets configured)
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
+        <div className="bg-amber-900/20 border border-amber-500/40 rounded-2xl p-8 max-w-lg w-full">
+          <div className="flex items-center gap-3 mb-4">
+            <AlertTriangle className="w-7 h-7 text-amber-400 shrink-0" />
+            <h1 className="text-lg font-bold text-amber-400">Configuration manquante</h1>
+          </div>
+          <p className="text-slate-300 text-sm mb-4">
+            Les variables d'environnement Supabase ne sont pas configurees. Si vous hebergez sur GitHub Pages, ajoutez les secrets suivants dans votre depot GitHub :
+          </p>
+          <ul className="space-y-1 text-sm font-mono text-slate-400 bg-slate-800 rounded-lg p-4">
+            <li>VITE_SUPABASE_URL</li>
+            <li>VITE_SUPABASE_ANON_KEY</li>
+          </ul>
+          <p className="text-slate-500 text-xs mt-4">
+            Depot GitHub → Settings → Secrets and variables → Actions → New repository secret
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (session === undefined) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -124,12 +143,10 @@ export default function App() {
     );
   }
 
-  // Not authenticated
   if (!session) {
     return <AuthPage />;
   }
 
-  // Authenticated but profile not yet loaded
   if (!userProfile) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -158,7 +175,6 @@ export default function App() {
       <header className="bg-slate-800 border-b border-slate-700 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Logo */}
             <div className="flex items-center gap-3">
               {defaultProfile?.logo_url ? (
                 <img
@@ -180,7 +196,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Desktop Nav */}
             <nav className="hidden md:flex items-center gap-1">
               {navItems.map((item) => (
                 <button
@@ -198,7 +213,6 @@ export default function App() {
               ))}
             </nav>
 
-            {/* User Menu */}
             <div className="flex items-center gap-2">
               <div className="relative hidden md:block">
                 <button
@@ -222,10 +236,7 @@ export default function App() {
 
                 {showUserMenu && (
                   <>
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setShowUserMenu(false)}
-                    />
+                    <div className="fixed inset-0 z-10" onClick={() => setShowUserMenu(false)} />
                     <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-20 overflow-hidden">
                       <div className="px-4 py-3 border-b border-slate-700">
                         <p className="text-sm font-medium text-white truncate">
@@ -255,7 +266,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Mobile Nav */}
         {isMenuOpen && (
           <nav className="md:hidden bg-slate-800 border-t border-slate-700 p-4 space-y-2">
             {navItems.map((item) => (
