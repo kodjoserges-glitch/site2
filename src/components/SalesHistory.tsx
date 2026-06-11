@@ -39,7 +39,7 @@ export function SalesHistory({ profiles, defaultProfile }: Props) {
 
       const { data, error } = await supabase
         .from('sales')
-        .select('*')
+        .select('*, sale_items(*)')
         .gte('created_at', startOfDay.toISOString())
         .lte('created_at', endOfDay.toISOString())
         .order('created_at', { ascending: false });
@@ -71,7 +71,8 @@ export function SalesHistory({ profiles, defaultProfile }: Props) {
   }
 
   function handlePrintInvoice(sale: Sale) {
-    generateInvoicePDF(sale, defaultProfile ?? undefined);
+    const company = profiles.find(p => p.id === defaultProfile?.id) ?? defaultProfile ?? undefined;
+    generateInvoicePDF(sale, company ?? undefined);
   }
 
   function handleExportCSV() {
@@ -230,10 +231,22 @@ export function SalesHistory({ profiles, defaultProfile }: Props) {
                       {sale.client_name}
                     </td>
                     <td className="py-3 px-4 text-sm text-slate-300">
-                      {sale.article_name}
+                      {sale.sale_items && sale.sale_items.length > 1 ? (
+                        <div className="space-y-0.5">
+                          {sale.sale_items.map((item, i) => (
+                            <div key={item.id ?? i} className="text-xs text-slate-400 truncate max-w-[160px]">
+                              {item.article_name}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        sale.article_name
+                      )}
                     </td>
                     <td className="py-3 px-4 text-sm text-right text-slate-300">
-                      {sale.pricing_type === 'format' ? (
+                      {sale.sale_items && sale.sale_items.length > 1 ? (
+                        <span className="text-xs text-slate-500">{sale.sale_items.length} articles</span>
+                      ) : sale.pricing_type === 'format' ? (
                         <span className="inline-flex items-center gap-1">
                           <Ruler className="w-3 h-3 text-blue-400" />
                           {(sale.width * 100).toFixed(0)}×{(sale.length * 100).toFixed(0)} cm
@@ -243,7 +256,9 @@ export function SalesHistory({ profiles, defaultProfile }: Props) {
                       )}
                     </td>
                     <td className="py-3 px-4 text-sm text-right font-medium">
-                      {sale.pricing_type === 'format' ? (
+                      {sale.sale_items && sale.sale_items.length > 1 ? (
+                        <span className="text-slate-500">—</span>
+                      ) : sale.pricing_type === 'format' ? (
                         <span className="text-blue-400">{sale.quantity} unité(s)</span>
                       ) : (
                         <span className="text-cyan-400">{sale.surface} m²</span>

@@ -32,7 +32,6 @@ export function generateInvoicePDF(sale: Sale, company?: Partial<CompanyProfile>
   doc.setFillColor(...primaryRgb);
   doc.rect(0, 0, pageWidth, 45, 'F');
 
-  // Company name
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(24);
   doc.setFont('helvetica', 'bold');
@@ -44,7 +43,6 @@ export function generateInvoicePDF(sale: Sale, company?: Partial<CompanyProfile>
     doc.text(c.slogan, pageWidth / 2, 28, { align: 'center' });
   }
 
-  // Invoice title
   doc.setTextColor(15, 23, 42);
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
@@ -53,7 +51,6 @@ export function generateInvoicePDF(sale: Sale, company?: Partial<CompanyProfile>
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 116, 139);
-
   doc.text('N Facture:', 20, 72);
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
@@ -81,26 +78,57 @@ export function generateInvoicePDF(sale: Sale, company?: Partial<CompanyProfile>
   doc.setFont('helvetica', 'bold');
   doc.text('DETAIL DE LA COMMANDE', 20, 102);
 
-  autoTable(doc, {
-    startY: 110,
-    head: [['Article', 'Dimensions', 'Surface', 'Prix/m2', 'Quantite', 'Total']],
-    body: [
-      [
+  const items = sale.sale_items;
+
+  if (items && items.length > 0) {
+    // Multi-item invoice
+    const rows = items.map(item => {
+      const isFormat = item.pricing_type === 'format';
+      const dims = isFormat
+        ? `${(item.width * 100).toFixed(0)} x ${(item.length * 100).toFixed(0)} cm`
+        : `${item.width}m x ${item.length}m`;
+      const unitInfo = isFormat
+        ? `${formatCurrency(item.price_per_sqm)}/unite`
+        : `${formatCurrency(item.price_per_sqm)}/m2`;
+      const qtyInfo = isFormat
+        ? `${item.quantity} u.`
+        : `${item.surface} m2 x ${item.quantity}`;
+      return [item.article_name, dims, qtyInfo, unitInfo, formatCurrency(item.subtotal)];
+    });
+
+    autoTable(doc, {
+      startY: 110,
+      head: [['Article', 'Dimensions', 'Surface / Qte', 'Prix unitaire', 'Sous-total']],
+      body: rows,
+      theme: 'grid',
+      headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
+      bodyStyles: { textColor: [15, 23, 42] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      margin: { left: 20, right: 20 },
+      styles: { cellPadding: 5, fontSize: 9 },
+      columnStyles: { 4: { halign: 'right', fontStyle: 'bold' } },
+    });
+  } else {
+    // Single-item legacy invoice
+    autoTable(doc, {
+      startY: 110,
+      head: [['Article', 'Dimensions', 'Surface', 'Prix/m2', 'Quantite', 'Total']],
+      body: [[
         sale.article_name,
         `${sale.width}m x ${sale.length}m`,
         `${sale.surface} m2`,
         formatCurrency(sale.price_per_sqm),
         sale.quantity.toString(),
         formatCurrency(sale.subtotal),
-      ],
-    ],
-    theme: 'grid',
-    headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-    bodyStyles: { textColor: [15, 23, 42] },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
-    margin: { left: 20, right: 20 },
-    styles: { cellPadding: 6, fontSize: 10 },
-  });
+      ]],
+      theme: 'grid',
+      headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
+      bodyStyles: { textColor: [15, 23, 42] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      margin: { left: 20, right: 20 },
+      styles: { cellPadding: 6, fontSize: 10 },
+    });
+  }
 
   const finalY = (doc as any).lastAutoTable.finalY + 10;
 

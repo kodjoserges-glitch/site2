@@ -66,6 +66,21 @@ export interface Article {
   updated_at: string;
 }
 
+export interface SaleItem {
+  id: string;
+  sale_id: string;
+  article_id: string | null;
+  article_name: string;
+  pricing_type: PricingType;
+  width: number;
+  length: number;
+  surface: number;
+  quantity: number;
+  price_per_sqm: number;
+  subtotal: number;
+  created_at: string;
+}
+
 export interface Sale {
   id: string;
   invoice_number: string;
@@ -86,6 +101,7 @@ export interface Sale {
   notes: string | null;
   pricing_type: PricingType;
   created_at: string;
+  sale_items?: SaleItem[];
 }
 
 export type PaymentStatus = 'paid' | 'advance' | 'unpaid';

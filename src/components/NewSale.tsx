@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Calculator, ShoppingCart, Loader2, Check, Building2, Tag, Ruler } from 'lucide-react';
+import { Calculator, ShoppingCart, Loader2, Check, Building2, Tag, Ruler, Plus, Trash2, PackageOpen } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Article, Category, Sale, PaymentStatus, DiscountType, CompanyProfile, ISO_FORMATS } from '../types';
-import { formatCurrency, calculateSurface, calculateTotal } from '../lib/utils';
+import { Article, Category, Sale, SaleItem, PaymentStatus, DiscountType, CompanyProfile, ISO_FORMATS } from '../types';
+import { formatCurrency, calculateSurface } from '../lib/utils';
 import { generateInvoicePDF } from '../lib/pdf';
 
 interface Props {
@@ -10,30 +10,41 @@ interface Props {
   defaultProfile: CompanyProfile | null;
 }
 
+interface LineItemState {
+  id: string;
+  categoryId: string;
+  articleId: string;
+  width: string;
+  length: string;
+  quantity: string;
+}
+
+function makeNewLine(categories: Category[], articles: Article[], prevCategoryId?: string): LineItemState {
+  const catId = prevCategoryId || categories[0]?.id || '';
+  const firstArt = articles.find(a => a.category_id === catId);
+  return {
+    id: crypto.randomUUID(),
+    categoryId: catId,
+    articleId: firstArt?.id ?? '',
+    width: '',
+    length: '',
+    quantity: '1',
+  };
+}
+
 export function NewSale({ profiles, defaultProfile }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [selectedProfileId, setSelectedProfileId] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState('');
 
+  const [selectedProfileId, setSelectedProfileId] = useState('');
   const [clientName, setClientName] = useState('');
-  const [selectedArticleId, setSelectedArticleId] = useState('');
-  const [width, setWidth] = useState('');
-  const [length, setLength] = useState('');
-  const [quantity, setQuantity] = useState('1');
+  const [lineItems, setLineItems] = useState<LineItemState[]>([]);
   const [discount, setDiscount] = useState('0');
   const [discountType, setDiscountType] = useState<DiscountType>('percentage');
   const [amountPaid, setAmountPaid] = useState('');
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('unpaid');
   const [notes, setNotes] = useState('');
-
-  const [surface, setSurface] = useState(0);
-  const [subtotal, setSubtotal] = useState(0);
-  const [discountAmount, setDiscountAmount] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [remaining, setRemaining] = useState(0);
 
   const [lastSale, setLastSale] = useState<Sale | null>(null);
 
@@ -57,12 +68,7 @@ export function NewSale({ profiles, defaultProfile }: Props) {
       const arts = artRes.data || [];
       setCategories(cats);
       setArticles(arts);
-      if (cats.length > 0) {
-        const firstCat = cats[0];
-        setSelectedCategoryId(firstCat.id);
-        const firstArt = arts.find(a => a.category_id === firstCat.id);
-        if (firstArt) setSelectedArticleId(firstArt.id);
-      }
+      setLineItems([makeNewLine(cats, arts)]);
     } catch (err) {
       console.error(err);
     } finally {
@@ -70,118 +76,150 @@ export function NewSale({ profiles, defaultProfile }: Props) {
     }
   }
 
-  function handleCategoryChange(catId: string) {
-    setSelectedCategoryId(catId);
-    const first = articles.find(a => a.category_id === catId);
-    setSelectedArticleId(first?.id ?? '');
-    setWidth('');
-    setLength('');
-  }
-
-  // When article changes, reset dimensions
-  function handleArticleChange(artId: string) {
-    setSelectedArticleId(artId);
-    setWidth('');
-    setLength('');
-  }
-
-  // Recalculate totals
-  useEffect(() => {
-    const art = articles.find(a => a.id === selectedArticleId);
-    const q = parseInt(quantity) || 1;
-    const d = parseFloat(discount) || 0;
-    const paid = parseFloat(amountPaid) || 0;
-
-    if (!art) {
-      setSurface(0); setSubtotal(0); setDiscountAmount(0); setTotal(0); setRemaining(0);
-      return;
-    }
-
+  // Compute derived values for a single line
+  function computeLine(line: LineItemState) {
+    const art = articles.find(a => a.id === line.articleId) ?? null;
+    if (!art) return { ...line, art, surface: 0, subtotal: 0 };
+    const q = Math.max(1, parseInt(line.quantity) || 1);
     if (art.pricing_type === 'format' && art.format) {
       const dims = ISO_FORMATS[art.format];
       const surf = Number((dims.width * dims.height).toFixed(4));
-      setSurface(surf);
-      const unitPrice = art.price_per_unit ?? 0;
-      const sub = unitPrice * q;
-      const discAmt = discountType === 'percentage' ? sub * (d / 100) : d;
-      const tot = Math.max(0, sub - discAmt);
-      setSubtotal(Number(sub.toFixed(2)));
-      setDiscountAmount(Number(discAmt.toFixed(2)));
-      setTotal(Number(tot.toFixed(2)));
-      setRemaining(Math.max(0, tot - paid));
-    } else {
-      const w = parseFloat(width) || 0;
-      const l = parseFloat(length) || 0;
-      const surf = calculateSurface(w, l);
-      setSurface(surf);
-      if (surf > 0) {
-        const result = calculateTotal(surf, art.price_per_sqm, q, d, discountType);
-        setSubtotal(result.subtotal);
-        setDiscountAmount(result.discountAmount);
-        setTotal(result.total);
-        setRemaining(Math.max(0, result.total - paid));
-      } else {
-        setSubtotal(0); setDiscountAmount(0); setTotal(0); setRemaining(0);
-      }
+      const sub = (art.price_per_unit ?? 0) * q;
+      return { ...line, art, surface: surf, subtotal: Number(sub.toFixed(2)) };
     }
-  }, [selectedArticleId, width, length, quantity, discount, discountType, amountPaid, articles]);
+    const w = parseFloat(line.width) || 0;
+    const l = parseFloat(line.length) || 0;
+    const surf = calculateSurface(w, l);
+    if (surf === 0) return { ...line, art, surface: 0, subtotal: 0 };
+    const sub = surf * art.price_per_sqm * q;
+    return { ...line, art, surface: surf, subtotal: Number(sub.toFixed(2)) };
+  }
 
-  useEffect(() => {
-    if (total === 0) return;
-    if (parseFloat(amountPaid) >= total) setPaymentStatus('paid');
-    else if (parseFloat(amountPaid) > 0) setPaymentStatus('advance');
-    else setPaymentStatus('unpaid');
-  }, [amountPaid, total]);
+  const computedLines = lineItems.map(computeLine);
+  const linesSubtotal = computedLines.reduce((s, l) => s + l.subtotal, 0);
+  const discountValue = parseFloat(discount) || 0;
+  const discountAmount = Number(
+    (discountType === 'percentage' ? linesSubtotal * (discountValue / 100) : discountValue).toFixed(2)
+  );
+  const grandTotal = Math.max(0, Number((linesSubtotal - discountAmount).toFixed(2)));
+  const amountPaidNum = parseFloat(amountPaid) || 0;
+  const remaining = Math.max(0, Number((grandTotal - amountPaidNum).toFixed(2)));
+  const paymentStatus: PaymentStatus =
+    grandTotal > 0 && amountPaidNum >= grandTotal ? 'paid' : amountPaidNum > 0 ? 'advance' : 'unpaid';
+
+  function updateLine(id: string, patch: Partial<LineItemState>) {
+    setLineItems(prev => prev.map(l => (l.id === id ? { ...l, ...patch } : l)));
+  }
+
+  function changeCategoryForLine(id: string, catId: string) {
+    const firstArt = articles.find(a => a.category_id === catId);
+    setLineItems(prev =>
+      prev.map(l =>
+        l.id === id ? { ...l, categoryId: catId, articleId: firstArt?.id ?? '', width: '', length: '' } : l
+      )
+    );
+  }
+
+  function changeArticleForLine(id: string, artId: string) {
+    setLineItems(prev =>
+      prev.map(l => (l.id === id ? { ...l, articleId: artId, width: '', length: '' } : l))
+    );
+  }
+
+  function addLine() {
+    const lastLine = lineItems[lineItems.length - 1];
+    setLineItems(prev => [...prev, makeNewLine(categories, articles, lastLine?.categoryId)]);
+  }
+
+  function removeLine(id: string) {
+    setLineItems(prev => prev.filter(l => l.id !== id));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const art = articles.find(a => a.id === selectedArticleId);
-    if (!clientName.trim() || !art) return;
+    if (!clientName.trim()) return;
 
-    const isFormat = art.pricing_type === 'format';
-    if (!isFormat && surface === 0) {
-      alert('Veuillez saisir les dimensions');
-      return;
+    // Validate all lines
+    for (const cl of computedLines) {
+      if (!cl.art) { alert('Un article est invalide dans la liste.'); return; }
+      if (cl.art.pricing_type !== 'format' && cl.surface === 0) {
+        alert(`Veuillez saisir les dimensions pour "${cl.art.name}".`);
+        return;
+      }
+      if (cl.subtotal === 0) {
+        alert(`Le sous-total de "${cl.art.name}" est nul.`);
+        return;
+      }
     }
-    if (isFormat && !art.format) return;
 
     setSaving(true);
     try {
-      let saleWidth: number, saleLength: number, saleSurface: number;
-      if (isFormat && art.format) {
-        const dims = ISO_FORMATS[art.format];
-        saleWidth = dims.width;
-        saleLength = dims.height;
-        saleSurface = Number((dims.width * dims.height).toFixed(4));
-      } else {
-        saleWidth = parseFloat(width);
-        saleLength = parseFloat(length);
-        saleSurface = surface;
-      }
+      const invoiceNumber = `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-4)}`;
+      const firstLine = computedLines[0];
+      const isMulti = computedLines.length > 1;
 
       const saleData = {
-        invoice_number: `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-4)}`,
+        invoice_number: invoiceNumber,
         client_name: clientName.trim(),
-        article_id: art.id,
-        article_name: art.name,
-        width: saleWidth,
-        length: saleLength,
-        surface: saleSurface,
-        quantity: parseInt(quantity),
-        price_per_sqm: isFormat ? (art.price_per_unit ?? 0) : art.price_per_sqm,
-        subtotal,
-        discount: parseFloat(discount) || 0,
+        article_id: firstLine.art!.id,
+        article_name: isMulti
+          ? `${computedLines.length} articles`
+          : firstLine.art!.name,
+        width: firstLine.art!.pricing_type === 'format' && firstLine.art!.format
+          ? ISO_FORMATS[firstLine.art!.format!].width
+          : parseFloat(firstLine.width) || 0,
+        length: firstLine.art!.pricing_type === 'format' && firstLine.art!.format
+          ? ISO_FORMATS[firstLine.art!.format!].height
+          : parseFloat(firstLine.length) || 0,
+        surface: firstLine.surface,
+        quantity: parseInt(firstLine.quantity) || 1,
+        price_per_sqm: firstLine.art!.pricing_type === 'format'
+          ? (firstLine.art!.price_per_unit ?? 0)
+          : firstLine.art!.price_per_sqm,
+        subtotal: linesSubtotal,
+        discount: discountValue,
         discount_type: discountType,
-        total,
-        amount_paid: parseFloat(amountPaid) || 0,
+        total: grandTotal,
+        amount_paid: amountPaidNum,
         payment_status: paymentStatus,
         notes: notes.trim() || null,
-        pricing_type: art.pricing_type,
+        pricing_type: firstLine.art!.pricing_type,
       };
 
-      const { data, error } = await supabase.from('sales').insert(saleData).select().single();
-      if (error) throw error;
-      setLastSale(data);
+      const { data: saleRecord, error: saleError } = await supabase
+        .from('sales')
+        .insert(saleData)
+        .select()
+        .single();
+      if (saleError) throw saleError;
+
+      // Insert all line items
+      const itemsPayload = computedLines.map(cl => ({
+        sale_id: saleRecord.id,
+        article_id: cl.art!.id,
+        article_name: cl.art!.name,
+        pricing_type: cl.art!.pricing_type,
+        width: cl.art!.pricing_type === 'format' && cl.art!.format
+          ? ISO_FORMATS[cl.art!.format!].width
+          : parseFloat(cl.width) || 0,
+        length: cl.art!.pricing_type === 'format' && cl.art!.format
+          ? ISO_FORMATS[cl.art!.format!].height
+          : parseFloat(cl.length) || 0,
+        surface: cl.surface,
+        quantity: parseInt(cl.quantity) || 1,
+        price_per_sqm: cl.art!.pricing_type === 'format'
+          ? (cl.art!.price_per_unit ?? 0)
+          : cl.art!.price_per_sqm,
+        subtotal: cl.subtotal,
+      }));
+
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('sale_items')
+        .insert(itemsPayload)
+        .select();
+      if (itemsError) throw itemsError;
+
+      setLastSale({ ...saleRecord, sale_items: itemsData ?? [] });
       resetForm();
     } catch (err) {
       console.error(err);
@@ -193,20 +231,13 @@ export function NewSale({ profiles, defaultProfile }: Props) {
 
   function resetForm() {
     setClientName('');
-    setWidth('');
-    setLength('');
-    setQuantity('1');
     setDiscount('0');
     setAmountPaid('');
-    setPaymentStatus('unpaid');
     setNotes('');
+    setLineItems([makeNewLine(categories, articles)]);
   }
 
-  const selectedArticle = articles.find(a => a.id === selectedArticleId);
-  const selectedCategory = categories.find(c => c.id === selectedCategoryId);
-  const filteredArticles = articles.filter(a => a.category_id === selectedCategoryId);
-  const isFormatArticle = selectedArticle?.pricing_type === 'format';
-  const formatDims = isFormatArticle && selectedArticle?.format ? ISO_FORMATS[selectedArticle.format] : null;
+  const selectedProfile = profiles.find(p => p.id === selectedProfileId) ?? defaultProfile ?? undefined;
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -216,10 +247,10 @@ export function NewSale({ profiles, defaultProfile }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Invoice success modal */}
+      {/* Success modal */}
       {lastSale && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl max-w-md w-full overflow-hidden border border-slate-700">
+          <div className="bg-slate-800 rounded-2xl max-w-lg w-full overflow-hidden border border-slate-700">
             <div className="p-6 bg-gradient-to-r from-green-600 to-emerald-600 text-white">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
@@ -233,20 +264,26 @@ export function NewSale({ profiles, defaultProfile }: Props) {
             </div>
             <div className="p-6 space-y-4">
               <div className="bg-slate-700/50 rounded-lg p-4 space-y-2">
-                {[
-                  ['Client', lastSale.client_name],
-                  ['Article', lastSale.article_name],
-                  lastSale.pricing_type === 'format'
-                    ? ['Quantite', `${lastSale.quantity} feuille(s)`]
-                    : ['Dimensions', `${lastSale.width}m × ${lastSale.length}m`],
-                  lastSale.pricing_type !== 'format' ? ['Surface', `${lastSale.surface} m²`] : null,
-                ].filter(Boolean).map(row => (
-                  <div key={row![0]} className="flex justify-between">
-                    <span className="text-slate-400">{row![0]}</span>
-                    <span className="font-medium">{row![1]}</span>
-                  </div>
-                ))}
                 <div className="flex justify-between">
+                  <span className="text-slate-400">Client</span>
+                  <span className="font-medium">{lastSale.client_name}</span>
+                </div>
+                {lastSale.sale_items && lastSale.sale_items.length > 0 ? (
+                  <div className="space-y-1">
+                    {lastSale.sale_items.map((item, i) => (
+                      <div key={item.id ?? i} className="flex justify-between text-sm">
+                        <span className="text-slate-400 truncate max-w-[55%]">{item.article_name}</span>
+                        <span className="text-slate-300">{formatCurrency(item.subtotal)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Article</span>
+                    <span className="font-medium">{lastSale.article_name}</span>
+                  </div>
+                )}
+                <div className="flex justify-between pt-2 border-t border-slate-600">
                   <span className="text-slate-400">Total</span>
                   <span className="font-bold text-lg text-green-400">{formatCurrency(lastSale.total)}</span>
                 </div>
@@ -258,11 +295,18 @@ export function NewSale({ profiles, defaultProfile }: Props) {
                 </div>
               </div>
               <div className="flex gap-3">
-                <button onClick={() => { const company = profiles.find(p => p.id === selectedProfileId) || defaultProfile || undefined; generateInvoicePDF(lastSale, company ?? undefined); }}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors">
+                <button
+                  onClick={() => generateInvoicePDF(lastSale, selectedProfile)}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors"
+                >
                   Imprimer Facture
                 </button>
-                <button onClick={() => setLastSale(null)} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-lg font-medium transition-colors">Fermer</button>
+                <button
+                  onClick={() => setLastSale(null)}
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-lg font-medium transition-colors"
+                >
+                  Fermer
+                </button>
               </div>
             </div>
           </div>
@@ -272,280 +316,339 @@ export function NewSale({ profiles, defaultProfile }: Props) {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Form */}
         <div className="lg:col-span-2">
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
-            <div className="p-6 border-b border-slate-700">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-600/20 rounded-lg flex items-center justify-center">
-                  <ShoppingCart className="w-5 h-5 text-blue-400" />
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Client info */}
+            <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
+              <div className="p-5 border-b border-slate-700 flex items-center gap-3">
+                <div className="w-9 h-9 bg-blue-600/20 rounded-lg flex items-center justify-center">
+                  <ShoppingCart className="w-4 h-4 text-blue-400" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-white">Nouvelle Vente</h2>
-                  <p className="text-sm text-slate-400">Remplissez les informations de la vente</p>
+                  <h2 className="text-base font-bold text-white">Nouvelle Vente</h2>
+                  <p className="text-xs text-slate-400">Ajoutez un ou plusieurs articles</p>
                 </div>
               </div>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              {/* Client */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Informations Client</h3>
+              <div className="p-5">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">Nom du client *</label>
-                    <input type="text" value={clientName} onChange={e => setClientName(e.target.value)}
+                    <input
+                      type="text"
+                      value={clientName}
+                      onChange={e => setClientName(e.target.value)}
                       className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="Nom du client" required />
+                      placeholder="Nom du client"
+                      required
+                    />
                   </div>
                   {profiles.length > 0 && (
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-2">
                         <Building2 className="inline w-4 h-4 mr-1 text-slate-400" />Profil entreprise
                       </label>
-                      <select value={selectedProfileId} onChange={e => setSelectedProfileId(e.target.value)}
-                        className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-                        {profiles.map(p => <option key={p.id} value={p.id}>{p.company_name}{p.is_default ? ' (defaut)' : ''}</option>)}
+                      <select
+                        value={selectedProfileId}
+                        onChange={e => setSelectedProfileId(e.target.value)}
+                        className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      >
+                        {profiles.map(p => (
+                          <option key={p.id} value={p.id}>{p.company_name}{p.is_default ? ' (defaut)' : ''}</option>
+                        ))}
                       </select>
                     </div>
                   )}
                 </div>
               </div>
+            </div>
 
-              {/* Category + Article */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Categorie et Article</h3>
+            {/* Line items */}
+            <div className="space-y-3">
+              {lineItems.map((line, index) => {
+                const cl = computedLines[index];
+                const art = cl?.art ?? null;
+                const isFormat = art?.pricing_type === 'format';
+                const formatDims = isFormat && art?.format ? ISO_FORMATS[art.format] : null;
+                const filteredArticles = articles.filter(a => a.category_id === line.categoryId);
 
-                {categories.length > 0 ? (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      <Tag className="inline w-4 h-4 mr-1 text-slate-400" />Categorie *
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {categories.map(cat => (
-                        <button key={cat.id} type="button" onClick={() => handleCategoryChange(cat.id)}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-all ${selectedCategoryId === cat.id ? 'text-white border-transparent shadow-md' : 'bg-slate-700 border-slate-600 text-slate-300 hover:border-slate-500'}`}
-                          style={selectedCategoryId === cat.id ? { backgroundColor: cat.color, borderColor: cat.color } : {}}>
-                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: selectedCategoryId === cat.id ? 'rgba(255,255,255,0.7)' : cat.color }} />
-                          {cat.name}
-                        </button>
-                      ))}
+                return (
+                  <div key={line.id} className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
+                    {/* Line header */}
+                    <div className="flex items-center justify-between px-5 py-3 border-b border-slate-700 bg-slate-700/30">
+                      <div className="flex items-center gap-2">
+                        <PackageOpen className="w-4 h-4 text-blue-400" />
+                        <span className="text-sm font-semibold text-slate-300">
+                          Article {index + 1}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {cl && cl.subtotal > 0 && (
+                          <span className="text-sm font-bold text-cyan-400">{formatCurrency(cl.subtotal)}</span>
+                        )}
+                        {lineItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeLine(line.id)}
+                            className="p-1.5 hover:bg-red-600/20 rounded text-slate-400 hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-5 space-y-4">
+                      {/* Category */}
+                      {categories.length > 0 && (
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                            <Tag className="inline w-3 h-3 mr-1" />Categorie
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {categories.map(cat => (
+                              <button
+                                key={cat.id}
+                                type="button"
+                                onClick={() => changeCategoryForLine(line.id, cat.id)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${line.categoryId === cat.id ? 'text-white border-transparent shadow-md' : 'bg-slate-700 border-slate-600 text-slate-300 hover:border-slate-500'}`}
+                                style={line.categoryId === cat.id ? { backgroundColor: cat.color, borderColor: cat.color } : {}}
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: line.categoryId === cat.id ? 'rgba(255,255,255,0.7)' : cat.color }} />
+                                {cat.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Article + Quantity */}
+                      <div className="grid sm:grid-cols-3 gap-3">
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-medium text-slate-400 mb-1.5">Article *</label>
+                          <select
+                            value={line.articleId}
+                            onChange={e => changeArticleForLine(line.id, e.target.value)}
+                            className="w-full px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                            required
+                          >
+                            {filteredArticles.length === 0
+                              ? <option value="">Aucun article</option>
+                              : filteredArticles.map(a => (
+                                <option key={a.id} value={a.id}>
+                                  {a.name} — {a.pricing_type === 'format'
+                                    ? `${formatCurrency(a.price_per_unit ?? 0)}/unite${a.format ? ` (${a.format})` : ''}`
+                                    : `${formatCurrency(a.price_per_sqm)}/m²`}
+                                </option>
+                              ))
+                            }
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-400 mb-1.5">Quantite</label>
+                          <input
+                            type="number"
+                            value={line.quantity}
+                            onChange={e => updateLine(line.id, { quantity: e.target.value })}
+                            className="w-full px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                            min="1"
+                            step="1"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Dimensions */}
+                      {isFormat && formatDims ? (
+                        <div className="flex items-center gap-3 p-3 bg-blue-600/10 border border-blue-600/30 rounded-xl">
+                          <Ruler className="w-4 h-4 text-blue-400 shrink-0" />
+                          <div className="text-sm">
+                            <span className="font-semibold text-white">Format {art?.format}</span>
+                            <span className="text-blue-300 ml-2">
+                              {(formatDims.width * 100).toFixed(0)} × {(formatDims.height * 100).toFixed(0)} cm
+                            </span>
+                          </div>
+                          <div className="ml-auto text-right">
+                            <span className="text-xs text-slate-400">Prix/unite</span>
+                            <p className="text-sm font-bold text-white">{formatCurrency(art?.price_per_unit ?? 0)}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1.5">Largeur (m) *</label>
+                            <input
+                              type="number"
+                              value={line.width}
+                              onChange={e => updateLine(line.id, { width: e.target.value })}
+                              className="w-full px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                              placeholder="0.00"
+                              step="0.01"
+                              min="0"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1.5">Longueur (m) *</label>
+                            <input
+                              type="number"
+                              value={line.length}
+                              onChange={e => updateLine(line.id, { length: e.target.value })}
+                              className="w-full px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                              placeholder="0.00"
+                              step="0.01"
+                              min="0"
+                              required
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  <div className="bg-slate-700/40 rounded-lg p-4 text-slate-400 text-sm text-center">
-                    Aucune categorie configuree. Ajoutez-en dans l'onglet Tarifs.
-                  </div>
-                )}
+                );
+              })}
 
-                <div className="grid sm:grid-cols-3 gap-4">
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Article *</label>
-                    <select value={selectedArticleId} onChange={e => handleArticleChange(e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" required>
-                      {filteredArticles.length === 0
-                        ? <option value="">Aucun article dans cette categorie</option>
-                        : filteredArticles.map(art => (
-                          <option key={art.id} value={art.id}>
-                            {art.name} — {art.pricing_type === 'format'
-                              ? `${formatCurrency(art.price_per_unit ?? 0)}/unité${art.format ? ` (${art.format})` : ''}`
-                              : `${formatCurrency(art.price_per_sqm)}/m²`}
-                          </option>
-                        ))
-                      }
+              {/* Add article button */}
+              <button
+                type="button"
+                onClick={addLine}
+                className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-slate-600 hover:border-blue-500 rounded-2xl text-slate-400 hover:text-blue-400 transition-all text-sm font-medium"
+              >
+                <Plus className="w-4 h-4" />
+                Ajouter un article
+              </button>
+            </div>
+
+            {/* Discount & Payment */}
+            <div className="bg-slate-800 rounded-2xl border border-slate-700 p-5 space-y-4">
+              <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Remise et Paiement</h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Remise</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      value={discount}
+                      onChange={e => setDiscount(e.target.value)}
+                      className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="0"
+                      step="0.01"
+                      min="0"
+                    />
+                    <select
+                      value={discountType}
+                      onChange={e => setDiscountType(e.target.value as DiscountType)}
+                      className="px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="percentage">%</option>
+                      <option value="fixed">FCFA</option>
                     </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Quantite</label>
-                    <input type="number" value={quantity} onChange={e => setQuantity(e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      min="1" step="1" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Dimensions — only for sqm articles */}
-              {!isFormatArticle ? (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Dimensions</h3>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">Largeur (metres) *</label>
-                      <input type="number" value={width} onChange={e => setWidth(e.target.value)}
-                        className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                        placeholder="0.00" step="0.01" min="0" required />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">Longueur (metres) *</label>
-                      <input type="number" value={length} onChange={e => setLength(e.target.value)}
-                        className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                        placeholder="0.00" step="0.01" min="0" required />
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* Format info banner */
-                selectedArticle?.format && formatDims && (
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Dimensions</h3>
-                    <div className="flex items-center gap-4 p-4 bg-blue-600/10 border border-blue-600/30 rounded-xl">
-                      <div className="w-10 h-10 bg-blue-600/20 rounded-lg flex items-center justify-center shrink-0">
-                        <Ruler className="w-5 h-5 text-blue-400" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-white">Format {selectedArticle.format}</p>
-                        <p className="text-sm text-blue-300">
-                          {(formatDims.width * 100).toFixed(0)} × {(formatDims.height * 100).toFixed(0)} cm
-                          &nbsp;·&nbsp; surface {(formatDims.width * formatDims.height).toFixed(4)} m²
-                        </p>
-                      </div>
-                      <div className="ml-auto text-right">
-                        <p className="text-xs text-slate-400">Prix unitaire</p>
-                        <p className="font-bold text-white">{formatCurrency(selectedArticle.price_per_unit ?? 0)}</p>
-                      </div>
-                    </div>
-                  </div>
-                )
-              )}
-
-              {/* Discount & Payment */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Remise et Paiement</h3>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Remise</label>
-                    <div className="flex gap-2">
-                      <input type="number" value={discount} onChange={e => setDiscount(e.target.value)}
-                        className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                        placeholder="0" step="0.01" min="0" />
-                      <select value={discountType} onChange={e => setDiscountType(e.target.value as DiscountType)}
-                        className="px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                        <option value="percentage">%</option>
-                        <option value="fixed">FCFA</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Montant verse</label>
-                    <input type="number" value={amountPaid} onChange={e => setAmountPaid(e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="0" step="1" min="0" />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Notes (optionnel)</label>
-                  <textarea value={notes} onChange={e => setNotes(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
-                    rows={2} placeholder="Informations supplementaires..." />
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Montant verse</label>
+                  <input
+                    type="number"
+                    value={amountPaid}
+                    onChange={e => setAmountPaid(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    placeholder="0"
+                    step="1"
+                    min="0"
+                  />
                 </div>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Notes (optionnel)</label>
+                <textarea
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+                  rows={2}
+                  placeholder="Informations supplementaires..."
+                />
+              </div>
+            </div>
 
-              <button type="submit" disabled={saving || total === 0}
-                className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-medium text-lg transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30">
-                {saving ? <><Loader2 className="w-5 h-5 animate-spin" />Enregistrement...</> : <><Calculator className="w-5 h-5" />Valider la vente — {formatCurrency(total)}</>}
-              </button>
-            </form>
-          </div>
+            <button
+              type="submit"
+              disabled={saving || grandTotal === 0}
+              className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-medium text-lg transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30"
+            >
+              {saving ? (
+                <><Loader2 className="w-5 h-5 animate-spin" />Enregistrement...</>
+              ) : (
+                <><Calculator className="w-5 h-5" />Valider la vente — {formatCurrency(grandTotal)}</>
+              )}
+            </button>
+          </form>
         </div>
 
         {/* Summary */}
         <div className="lg:col-span-1">
           <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden sticky top-24">
-            <div className="p-6 border-b border-slate-700 bg-gradient-to-r from-slate-700 to-slate-800">
+            <div className="p-5 border-b border-slate-700 bg-gradient-to-r from-slate-700 to-slate-800">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-cyan-600/20 rounded-lg flex items-center justify-center">
-                  <Calculator className="w-5 h-5 text-cyan-400" />
+                <div className="w-9 h-9 bg-cyan-600/20 rounded-lg flex items-center justify-center">
+                  <Calculator className="w-4 h-4 text-cyan-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Recapitulatif</h3>
-                  <p className="text-sm text-slate-400">Calcul automatique</p>
+                  <h3 className="text-base font-bold text-white">Recapitulatif</h3>
+                  <p className="text-xs text-slate-400">{computedLines.length} article(s)</p>
                 </div>
               </div>
             </div>
 
-            <div className="p-6 space-y-4">
-              {selectedCategory && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: `${selectedCategory.color}20` }}>
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: selectedCategory.color }} />
-                  <span className="text-slate-300">{selectedCategory.name}</span>
-                </div>
-              )}
-
-              {selectedArticle && (
-                <div className="bg-slate-700/50 rounded-lg p-4 space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400 text-sm">Article</span>
-                    <span className="font-medium text-white text-right max-w-[60%] truncate">{selectedArticle.name}</span>
-                  </div>
-                  {isFormatArticle ? (
-                    <>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400 text-sm">Format</span>
-                        <span className="font-medium text-white">{selectedArticle.format}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400 text-sm">Prix/unité</span>
-                        <span className="font-medium text-white">{formatCurrency(selectedArticle.price_per_unit ?? 0)}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 text-sm">Prix/m²</span>
-                      <span className="font-medium text-white">{formatCurrency(selectedArticle.price_per_sqm)}</span>
+            <div className="p-5 space-y-4">
+              {/* Lines summary */}
+              <div className="space-y-2">
+                {computedLines.map((cl, i) => (
+                  <div key={cl.id} className="bg-slate-700/40 rounded-lg p-3 space-y-1.5">
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="text-xs text-slate-400">Art. {i + 1}</span>
+                      <span className="text-xs font-semibold text-white text-right truncate max-w-[70%]">
+                        {cl.art?.name ?? '—'}
+                      </span>
                     </div>
-                  )}
-                </div>
-              )}
-
-              <div className="space-y-3">
-                {isFormatArticle ? (
-                  <>
-                    {selectedArticle?.format && formatDims && (
-                      <div className="flex justify-between">
-                        <span className="text-slate-400 text-sm">Dimensions</span>
-                        <span className="text-white">{(formatDims.width * 100).toFixed(0)}×{(formatDims.height * 100).toFixed(0)} cm</span>
-                      </div>
+                    {cl.art && (
+                      <>
+                        {cl.art.pricing_type === 'format' && cl.art.format ? (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">Format {cl.art.format} × {cl.quantity}</span>
+                            <span className="text-cyan-400 font-medium">{formatCurrency(cl.subtotal)}</span>
+                          </div>
+                        ) : (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">
+                              {cl.width || '0'}m × {cl.length || '0'}m × {cl.quantity}
+                            </span>
+                            <span className="text-cyan-400 font-medium">{formatCurrency(cl.subtotal)}</span>
+                          </div>
+                        )}
+                      </>
                     )}
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 text-sm">Quantite</span>
-                      <span className="font-medium text-cyan-400">{quantity} feuille(s)</span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 text-sm">Dimensions</span>
-                      <span className="font-medium text-white">{width || '0'}m × {length || '0'}m</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 text-sm">Surface</span>
-                      <span className="font-medium text-cyan-400">{surface} m²</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 text-sm">Quantite</span>
-                      <span className="font-medium text-white">{quantity}</span>
-                    </div>
-                  </>
-                )}
+                  </div>
+                ))}
               </div>
 
               <div className="border-t border-slate-600 pt-4 space-y-3">
                 <div className="flex justify-between">
                   <span className="text-slate-400 text-sm">Sous-total</span>
-                  <span className="font-medium text-white">{formatCurrency(subtotal)}</span>
+                  <span className="font-medium text-white">{formatCurrency(linesSubtotal)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400 text-sm">Remise</span>
-                  <span className="font-medium text-red-400">-{formatCurrency(discountAmount)}</span>
-                </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400 text-sm">Remise</span>
+                    <span className="font-medium text-red-400">-{formatCurrency(discountAmount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between pt-2 border-t border-slate-600">
                   <span className="text-slate-300 font-medium">Total</span>
-                  <span className="font-bold text-2xl text-green-400">{formatCurrency(total)}</span>
+                  <span className="font-bold text-2xl text-green-400">{formatCurrency(grandTotal)}</span>
                 </div>
               </div>
 
               <div className="border-t border-slate-600 pt-4 space-y-3">
                 <div className="flex justify-between">
                   <span className="text-slate-400 text-sm">Montant verse</span>
-                  <span className="font-medium text-green-400">{formatCurrency(parseFloat(amountPaid) || 0)}</span>
+                  <span className="font-medium text-green-400">{formatCurrency(amountPaidNum)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400 text-sm">Reste a payer</span>
