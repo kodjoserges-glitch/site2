@@ -87,7 +87,7 @@ export function NewSale({ profiles, defaultProfile, currentUser }: Props) {
     const q = Math.max(1, parseInt(line.quantity) || 1);
     if (art.pricing_type === 'format' && art.format) {
       const dims = ISO_FORMATS[art.format];
-      const surf = Number((dims.width * dims.height).toFixed(4));
+      const surf = Number((dims.width * dims.height).toFixed(6));
       const sub = (art.price_per_unit ?? 0) * q;
       return { ...line, art, surface: surf, subtotal: Number(sub.toFixed(2)) };
     }
