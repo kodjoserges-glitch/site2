@@ -104,6 +104,8 @@ export interface Sale {
   pricing_type: PricingType;
   created_at: string;
   settled_at: string | null;
+  seller_id: string | null;
+  seller_name: string | null;
   sale_items?: SaleItem[];
 }
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Calculator, ShoppingCart, Loader2, Check, Building2, Tag, Ruler, Plus, Trash2, PackageOpen, Printer, FileDown, TrendingUp } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Article, Category, Sale, SaleItem, PaymentStatus, DiscountType, MajorationType, CompanyProfile, ISO_FORMATS } from '../types';
+import { Article, Category, Sale, SaleItem, PaymentStatus, DiscountType, MajorationType, CompanyProfile, UserProfile, ISO_FORMATS } from '../types';
 import { formatCurrency, calculateSurface } from '../lib/utils';
 import { generateInvoicePDF } from '../lib/pdf';
 import { printReceipt } from '../lib/receipt';
@@ -9,6 +9,7 @@ import { printReceipt } from '../lib/receipt';
 interface Props {
   profiles: CompanyProfile[];
   defaultProfile: CompanyProfile | null;
+  currentUser: UserProfile;
 }
 
 interface LineItemState {
@@ -33,7 +34,7 @@ function makeNewLine(categories: Category[], articles: Article[], prevCategoryId
   };
 }
 
-export function NewSale({ profiles, defaultProfile }: Props) {
+export function NewSale({ profiles, defaultProfile, currentUser }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,6 +194,8 @@ export function NewSale({ profiles, defaultProfile }: Props) {
         payment_status: paymentStatus,
         notes: notes.trim() || null,
         pricing_type: firstLine.art!.pricing_type,
+        seller_id: currentUser.id,
+        seller_name: currentUser.full_name,
       };
 
       const { data: saleRecord, error: saleError } = await supabase

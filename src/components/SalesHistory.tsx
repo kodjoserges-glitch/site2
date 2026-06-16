@@ -569,6 +569,9 @@ export function SalesHistory({ profiles, defaultProfile, currentUser }: Props) {
                   <th className="text-center py-3 px-4 text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Statut
                   </th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    Vendeur
+                  </th>
                   <th className="text-center py-3 px-4 text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Actions
                   </th>
@@ -647,6 +650,13 @@ export function SalesHistory({ profiles, defaultProfile, currentUser }: Props) {
                             </span>
                           )}
                         </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        {sale.seller_name ? (
+                          <span className="text-sm text-slate-300 font-medium">{sale.seller_name}</span>
+                        ) : (
+                          <span className="text-xs text-slate-600">—</span>
+                        )}
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-center gap-1">
