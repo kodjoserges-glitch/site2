@@ -366,7 +366,7 @@ export default function App() {
           <NewSale profiles={profiles} defaultProfile={defaultProfile} />
         )}
         {activeTab === 'history' && (
-          <SalesHistory profiles={profiles} defaultProfile={defaultProfile} />
+          <SalesHistory profiles={profiles} defaultProfile={defaultProfile} currentUser={userProfile} />
         )}
         {activeTab === 'prices' && <PriceManagement />}
         {activeTab === 'company' && <CompanySettings onUpdate={fetchCompanyProfiles} />}

@@ -10,9 +10,14 @@ import {
   Calendar,
   Ruler,
   FileDown,
+  Lock,
+  ShieldAlert,
+  Eye,
+  EyeOff,
+  AlertTriangle,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Sale, CompanyProfile } from '../types';
+import { Sale, CompanyProfile, UserProfile } from '../types';
 import { formatCurrency, formatDate, exportToCSV } from '../lib/utils';
 import { generateInvoicePDF } from '../lib/pdf';
 import { printReceipt } from '../lib/receipt';
@@ -20,12 +25,29 @@ import { printReceipt } from '../lib/receipt';
 interface Props {
   profiles: CompanyProfile[];
   defaultProfile: CompanyProfile | null;
+  currentUser: UserProfile;
 }
 
-export function SalesHistory({ profiles, defaultProfile }: Props) {
+interface DeleteRequest {
+  saleId: string;
+  invoiceNumber: string;
+  clientName: string;
+  total: number;
+}
+
+export function SalesHistory({ profiles, defaultProfile, currentUser }: Props) {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Delete auth modal state
+  const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const canDelete = currentUser.role === 'admin' || currentUser.role === 'manager';
 
   useEffect(() => {
     fetchSales();
@@ -55,20 +77,58 @@ export function SalesHistory({ profiles, defaultProfile }: Props) {
     }
   }
 
-  async function handleDeleteSale(id: string) {
-    if (!confirm('Etes-vous sur de vouloir supprimer cette vente?')) return;
+  function requestDelete(sale: Sale) {
+    if (!canDelete) return;
+    setDeleteRequest({
+      saleId: sale.id,
+      invoiceNumber: sale.invoice_number,
+      clientName: sale.client_name,
+      total: sale.total,
+    });
+    setDeletePassword('');
+    setDeleteError('');
+    setShowDeletePassword(false);
+  }
+
+  function cancelDelete() {
+    setDeleteRequest(null);
+    setDeletePassword('');
+    setDeleteError('');
+  }
+
+  async function confirmDelete() {
+    if (!deleteRequest || !deletePassword.trim()) return;
+    setDeleteLoading(true);
+    setDeleteError('');
 
     try {
-      const { error } = await supabase
+      // Verify the manager/admin's own password
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: currentUser.email,
+        password: deletePassword,
+      });
+
+      if (authError) {
+        setDeleteError('Mot de passe incorrect. Suppression annulee.');
+        setDeleteLoading(false);
+        return;
+      }
+
+      // Password verified — proceed with deletion
+      const { error: deleteError } = await supabase
         .from('sales')
         .delete()
-        .eq('id', id);
+        .eq('id', deleteRequest.saleId);
 
-      if (error) throw error;
-      setSales(sales.filter(s => s.id !== id));
-    } catch (error) {
-      console.error('Error deleting sale:', error);
-      alert('Erreur lors de la suppression');
+      if (deleteError) throw deleteError;
+
+      setSales(prev => prev.filter(s => s.id !== deleteRequest.saleId));
+      cancelDelete();
+    } catch (err) {
+      console.error(err);
+      setDeleteError('Erreur lors de la suppression. Reessayez.');
+    } finally {
+      setDeleteLoading(false);
     }
   }
 
@@ -96,6 +156,106 @@ export function SalesHistory({ profiles, defaultProfile }: Props) {
 
   return (
     <div className="space-y-6">
+
+      {/* Delete Authorization Modal */}
+      {deleteRequest && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-2xl max-w-md w-full overflow-hidden border border-red-600/40 shadow-2xl">
+            {/* Header */}
+            <div className="bg-red-600/15 border-b border-red-600/30 p-5 flex items-start gap-4">
+              <div className="w-11 h-11 bg-red-600/25 rounded-full flex items-center justify-center shrink-0">
+                <ShieldAlert className="w-6 h-6 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Autorisation requise</h3>
+                <p className="text-sm text-slate-400 mt-0.5">
+                  Saisissez votre mot de passe pour autoriser cette suppression
+                </p>
+              </div>
+            </div>
+
+            {/* Sale info */}
+            <div className="px-5 pt-5 pb-3">
+              <div className="bg-slate-700/50 rounded-xl p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Facture</span>
+                  <span className="font-mono text-blue-400 font-medium">{deleteRequest.invoiceNumber}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Client</span>
+                  <span className="text-white font-medium">{deleteRequest.clientName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Montant</span>
+                  <span className="text-green-400 font-bold">{formatCurrency(deleteRequest.total)}</span>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-start gap-2 text-xs text-amber-400 bg-amber-600/10 border border-amber-600/20 rounded-lg p-3">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>Cette action est irréversible. La vente sera definitivement supprimee.</span>
+              </div>
+            </div>
+
+            {/* Password input */}
+            <div className="px-5 pb-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                  Votre mot de passe ({currentUser.role === 'admin' ? 'Administrateur' : 'Manager'})
+                </label>
+                <div className="relative">
+                  <input
+                    type={showDeletePassword ? 'text' : 'password'}
+                    value={deletePassword}
+                    onChange={e => { setDeletePassword(e.target.value); setDeleteError(''); }}
+                    onKeyDown={e => e.key === 'Enter' && confirmDelete()}
+                    className="w-full px-4 py-3 pr-12 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                    placeholder="Mot de passe..."
+                    autoFocus
+                    disabled={deleteLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDeletePassword(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300 transition-colors"
+                  >
+                    {showDeletePassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                {deleteError && (
+                  <p className="mt-2 text-sm text-red-400 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    {deleteError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={cancelDelete}
+                  disabled={deleteLoading}
+                  className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={deleteLoading || !deletePassword.trim()}
+                  className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  {deleteLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  Confirmer la suppression
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
         <div className="p-6 border-b border-slate-700">
@@ -179,6 +339,14 @@ export function SalesHistory({ profiles, defaultProfile }: Props) {
           Exporter CSV
         </button>
       </div>
+
+      {/* Permission notice for vendeur */}
+      {!canDelete && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-400">
+          <Lock className="w-4 h-4 text-slate-500 shrink-0" />
+          La suppression d'une vente necessite l'autorisation d'un Manager ou Administrateur.
+        </div>
+      )}
 
       {/* Sales Table */}
       <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
@@ -305,13 +473,22 @@ export function SalesHistory({ profiles, defaultProfile }: Props) {
                         >
                           <FileDown className="w-4 h-4" />
                         </button>
-                        <button
-                          onClick={() => handleDeleteSale(sale.id)}
-                          className="p-1.5 hover:bg-red-600/20 rounded text-slate-300 hover:text-red-400 transition-colors"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {canDelete ? (
+                          <button
+                            onClick={() => requestDelete(sale)}
+                            className="p-1.5 hover:bg-red-600/20 rounded text-slate-400 hover:text-red-400 transition-colors"
+                            title="Supprimer (autorisation requise)"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <span
+                            className="p-1.5 text-slate-600 cursor-not-allowed"
+                            title="Suppression non autorisee - contacter un responsable"
+                          >
+                            <Lock className="w-4 h-4" />
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>
