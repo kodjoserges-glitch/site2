@@ -134,8 +134,8 @@ export function PriceManagement() {
       const payload = {
         name: artForm.name.trim(),
         pricing_type: artForm.pricing_type,
-        price_per_sqm: isFormat ? 0 : parseFloat(artForm.price_per_sqm),
-        price_per_unit: isFormat ? parseFloat(artForm.price_per_unit) : null,
+        price_per_sqm: isFormat ? 0 : Math.round(parseFloat(artForm.price_per_sqm)),
+        price_per_unit: isFormat ? Math.round(parseFloat(artForm.price_per_unit)) : null,
         format: isFormat ? artForm.format : null,
       };
       if (editingArtId) {
@@ -396,7 +396,7 @@ export function PriceManagement() {
                   <label className="block text-sm font-medium text-slate-300 mb-1.5">Prix par m² (FCFA) *</label>
                   <input type="number" value={artForm.price_per_sqm} onChange={e => setArtForm({ ...artForm, price_per_sqm: e.target.value })}
                     className="w-full px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="5000" step="100" min="1" required />
+                    placeholder="5000" step="1" min="1" required />
                 </div>
               )}
 
@@ -430,7 +430,7 @@ export function PriceManagement() {
                     <label className="block text-sm font-medium text-slate-300 mb-1.5">Prix par unité / feuille (FCFA) *</label>
                     <input type="number" value={artForm.price_per_unit} onChange={e => setArtForm({ ...artForm, price_per_unit: e.target.value })}
                       className="w-full px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="500" step="50" min="1" required />
+                      placeholder="500" step="1" min="1" required />
                   </div>
                 </>
               )}
