@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Calculator, ShoppingCart, Loader2, Check, Building2, Tag, Ruler, Plus, Trash2, PackageOpen } from 'lucide-react';
+import { Calculator, ShoppingCart, Loader2, Check, Building2, Tag, Ruler, Plus, Trash2, PackageOpen, Printer, FileDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Article, Category, Sale, SaleItem, PaymentStatus, DiscountType, CompanyProfile, ISO_FORMATS } from '../types';
 import { formatCurrency, calculateSurface } from '../lib/utils';
 import { generateInvoicePDF } from '../lib/pdf';
+import { printReceipt } from '../lib/receipt';
 
 interface Props {
   profiles: CompanyProfile[];
@@ -296,10 +297,19 @@ export function NewSale({ profiles, defaultProfile }: Props) {
               </div>
               <div className="flex gap-3">
                 <button
-                  onClick={() => generateInvoicePDF(lastSale, selectedProfile)}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors"
+                  onClick={() => printReceipt(lastSale, selectedProfile)}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                 >
-                  Imprimer Facture
+                  <Printer className="w-4 h-4" />
+                  Imprimer Ticket
+                </button>
+                <button
+                  onClick={() => generateInvoicePDF(lastSale, selectedProfile)}
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-medium transition-colors"
+                  title="Telecharger PDF A4"
+                >
+                  <FileDown className="w-4 h-4" />
+                  PDF
                 </button>
                 <button
                   onClick={() => setLastSale(null)}

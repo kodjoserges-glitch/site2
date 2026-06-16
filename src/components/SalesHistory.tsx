@@ -9,11 +9,13 @@ import {
   RefreshCw,
   Calendar,
   Ruler,
+  FileDown,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Sale, CompanyProfile } from '../types';
 import { formatCurrency, formatDate, exportToCSV } from '../lib/utils';
 import { generateInvoicePDF } from '../lib/pdf';
+import { printReceipt } from '../lib/receipt';
 
 interface Props {
   profiles: CompanyProfile[];
@@ -71,6 +73,11 @@ export function SalesHistory({ profiles, defaultProfile }: Props) {
   }
 
   function handlePrintInvoice(sale: Sale) {
+    const company = profiles.find(p => p.id === defaultProfile?.id) ?? defaultProfile ?? undefined;
+    printReceipt(sale, company ?? undefined);
+  }
+
+  function handleDownloadPDF(sale: Sale) {
     const company = profiles.find(p => p.id === defaultProfile?.id) ?? defaultProfile ?? undefined;
     generateInvoicePDF(sale, company ?? undefined);
   }
@@ -286,10 +293,17 @@ export function SalesHistory({ profiles, defaultProfile }: Props) {
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => handlePrintInvoice(sale)}
-                          className="p-1.5 hover:bg-slate-600 rounded text-slate-300 hover:text-white transition-colors"
-                          title="Imprimer"
+                          className="p-1.5 hover:bg-blue-600/20 rounded text-slate-300 hover:text-blue-400 transition-colors"
+                          title="Imprimer ticket thermique"
                         >
                           <Printer className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDownloadPDF(sale)}
+                          className="p-1.5 hover:bg-slate-600 rounded text-slate-400 hover:text-white transition-colors"
+                          title="Telecharger PDF A4"
+                        >
+                          <FileDown className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteSale(sale.id)}
