@@ -44,6 +44,11 @@ export function printReceipt(sale: Sale, company?: Partial<CompanyProfile>): voi
   const statusLabel = sale.payment_status === 'paid' ? 'PAYE' : sale.payment_status === 'advance' ? 'AVANCE' : 'NON PAYE';
   const statusBg = sale.payment_status === 'paid' ? '#16a34a' : sale.payment_status === 'advance' ? '#d97706' : '#dc2626';
 
+  const majorationAmount = (sale.majoration ?? 0) > 0
+    ? sale.majoration_type === 'percentage'
+      ? sale.subtotal * (sale.majoration / 100)
+      : sale.majoration
+    : 0;
   const discountAmount = sale.discount_type === 'percentage'
     ? sale.subtotal * (sale.discount / 100)
     : sale.discount;
@@ -225,7 +230,11 @@ export function printReceipt(sale: Sale, company?: Partial<CompanyProfile>): voi
       sale.discount_type === 'percentage' ? `Remise (${sale.discount}%)` : 'Remise',
       `-${fmt(discountAmount)}`
     ) : ''}
-    ${discountAmount > 0 ? sep() : ''}
+    ${majorationAmount > 0 ? row(
+      `&#9650; ${sale.majoration_type === 'percentage' ? `Maj. (${sale.majoration}%)` : 'Maj.'}`,
+      `+${fmt(majorationAmount)}`
+    ) : ''}
+    ${(discountAmount > 0 || majorationAmount > 0) ? sep() : ''}
     <tr class="total-row">
       <td>TOTAL</td>
       <td style="text-align:right;">${fmt(sale.total)}</td>

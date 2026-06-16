@@ -149,30 +149,43 @@ export function generateInvoicePDF(sale: Sale, company?: Partial<CompanyProfile>
     doc.text(`-${formatCurrency(discountVal)}`, pageWidth - 20, finalY + 8, { align: 'right' });
   }
 
+  const majoration = sale.majoration ?? 0;
+  const majorationOffset = sale.discount > 0 ? 16 : 8;
+  if (majoration > 0) {
+    const majorationVal = sale.majoration_type === 'percentage'
+      ? sale.subtotal * (majoration / 100)
+      : majoration;
+    doc.setTextColor(100, 116, 139);
+    doc.text(`+ Majoration${sale.majoration_type === 'percentage' ? ` (${majoration}%)` : ''}:`, pageWidth - 90, finalY + majorationOffset);
+    doc.setTextColor(217, 119, 6);
+    doc.text(`+${formatCurrency(majorationVal)}`, pageWidth - 20, finalY + majorationOffset, { align: 'right' });
+  }
+
+  const sepOffset = (sale.discount > 0 && majoration > 0) ? 24 : (sale.discount > 0 || majoration > 0) ? 16 : 8;
   doc.setDrawColor(226, 232, 240);
-  doc.line(pageWidth - 90, finalY + 15, pageWidth - 20, finalY + 15);
+  doc.line(pageWidth - 90, finalY + sepOffset, pageWidth - 20, finalY + sepOffset);
 
   doc.setFontSize(14);
   doc.setTextColor(...primaryRgb);
   doc.setFont('helvetica', 'bold');
-  doc.text('TOTAL:', pageWidth - 90, finalY + 25);
+  doc.text('TOTAL:', pageWidth - 90, finalY + sepOffset + 10);
   doc.setTextColor(16, 185, 129);
-  doc.text(formatCurrency(sale.total), pageWidth - 20, finalY + 25, { align: 'right' });
+  doc.text(formatCurrency(sale.total), pageWidth - 20, finalY + sepOffset + 10, { align: 'right' });
 
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
   doc.setFont('helvetica', 'normal');
-  doc.text('Montant verse:', pageWidth - 90, finalY + 35);
+  doc.text('Montant verse:', pageWidth - 90, finalY + sepOffset + 20);
   doc.setTextColor(15, 23, 42);
-  doc.text(formatCurrency(sale.amount_paid), pageWidth - 20, finalY + 35, { align: 'right' });
+  doc.text(formatCurrency(sale.amount_paid), pageWidth - 20, finalY + sepOffset + 20, { align: 'right' });
 
   const remaining = sale.total - sale.amount_paid;
   doc.setTextColor(100, 116, 139);
-  doc.text('Reste a payer:', pageWidth - 90, finalY + 43);
+  doc.text('Reste a payer:', pageWidth - 90, finalY + sepOffset + 28);
   doc.setTextColor(remaining > 0 ? 234 : 16, remaining > 0 ? 88 : 185, remaining > 0 ? 12 : 129);
-  doc.text(formatCurrency(remaining), pageWidth - 20, finalY + 43, { align: 'right' });
+  doc.text(formatCurrency(remaining), pageWidth - 20, finalY + sepOffset + 28, { align: 'right' });
 
-  const statusY = finalY + 53;
+  const statusY = finalY + sepOffset + 40;
   const statusText = sale.payment_status === 'paid' ? 'PAYE' : sale.payment_status === 'advance' ? 'AVANCE' : 'NON PAYE';
   const statusColor: [number, number, number] = sale.payment_status === 'paid' ? [16, 185, 129] : sale.payment_status === 'advance' ? [234, 179, 8] : [239, 68, 68];
   doc.setFillColor(...statusColor);

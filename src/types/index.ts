@@ -95,6 +95,8 @@ export interface Sale {
   subtotal: number;
   discount: number;
   discount_type: 'percentage' | 'fixed';
+  majoration: number;
+  majoration_type: 'percentage' | 'fixed';
   total: number;
   amount_paid: number;
   payment_status: 'paid' | 'advance' | 'unpaid';
@@ -106,6 +108,7 @@ export interface Sale {
 
 export type PaymentStatus = 'paid' | 'advance' | 'unpaid';
 export type DiscountType = 'percentage' | 'fixed';
+export type MajorationType = 'percentage' | 'fixed';
 
 export type UserRole = 'admin' | 'manager' | 'vendeur';
 

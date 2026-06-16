@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Calculator, ShoppingCart, Loader2, Check, Building2, Tag, Ruler, Plus, Trash2, PackageOpen, Printer, FileDown } from 'lucide-react';
+import { Calculator, ShoppingCart, Loader2, Check, Building2, Tag, Ruler, Plus, Trash2, PackageOpen, Printer, FileDown, TrendingUp } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Article, Category, Sale, SaleItem, PaymentStatus, DiscountType, CompanyProfile, ISO_FORMATS } from '../types';
+import { Article, Category, Sale, SaleItem, PaymentStatus, DiscountType, MajorationType, CompanyProfile, ISO_FORMATS } from '../types';
 import { formatCurrency, calculateSurface } from '../lib/utils';
 import { generateInvoicePDF } from '../lib/pdf';
 import { printReceipt } from '../lib/receipt';
@@ -44,6 +44,8 @@ export function NewSale({ profiles, defaultProfile }: Props) {
   const [lineItems, setLineItems] = useState<LineItemState[]>([]);
   const [discount, setDiscount] = useState('0');
   const [discountType, setDiscountType] = useState<DiscountType>('percentage');
+  const [majoration, setMajoration] = useState('0');
+  const [majorationType, setMajorationType] = useState<MajorationType>('fixed');
   const [amountPaid, setAmountPaid] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -102,7 +104,11 @@ export function NewSale({ profiles, defaultProfile }: Props) {
   const discountAmount = Number(
     (discountType === 'percentage' ? linesSubtotal * (discountValue / 100) : discountValue).toFixed(2)
   );
-  const grandTotal = Math.max(0, Number((linesSubtotal - discountAmount).toFixed(2)));
+  const majorationValue = parseFloat(majoration) || 0;
+  const majorationAmount = Number(
+    (majorationType === 'percentage' ? linesSubtotal * (majorationValue / 100) : majorationValue).toFixed(2)
+  );
+  const grandTotal = Math.max(0, Number((linesSubtotal - discountAmount + majorationAmount).toFixed(2)));
   const amountPaidNum = parseFloat(amountPaid) || 0;
   const remaining = Math.max(0, Number((grandTotal - amountPaidNum).toFixed(2)));
   const paymentStatus: PaymentStatus =
@@ -180,6 +186,8 @@ export function NewSale({ profiles, defaultProfile }: Props) {
         subtotal: linesSubtotal,
         discount: discountValue,
         discount_type: discountType,
+        majoration: majorationValue,
+        majoration_type: majorationType,
         total: grandTotal,
         amount_paid: amountPaidNum,
         payment_status: paymentStatus,
@@ -233,6 +241,7 @@ export function NewSale({ profiles, defaultProfile }: Props) {
   function resetForm() {
     setClientName('');
     setDiscount('0');
+    setMajoration('0');
     setAmountPaid('');
     setNotes('');
     setLineItems([makeNewLine(categories, articles)]);
@@ -528,7 +537,7 @@ export function NewSale({ profiles, defaultProfile }: Props) {
 
             {/* Discount & Payment */}
             <div className="bg-slate-800 rounded-2xl border border-slate-700 p-5 space-y-4">
-              <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Remise et Paiement</h3>
+              <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Remise, Majoration et Paiement</h3>
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">Remise</label>
@@ -553,17 +562,42 @@ export function NewSale({ profiles, defaultProfile }: Props) {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Montant verse</label>
-                  <input
-                    type="number"
-                    value={amountPaid}
-                    onChange={e => setAmountPaid(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    placeholder="0"
-                    step="1"
-                    min="0"
-                  />
+                  <label className="block text-sm font-medium text-amber-300 mb-2 flex items-center gap-1.5">
+                    <TrendingUp className="w-4 h-4" />
+                    Majoration
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      value={majoration}
+                      onChange={e => setMajoration(e.target.value)}
+                      className="flex-1 px-4 py-3 bg-slate-700 border border-amber-600/40 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                      placeholder="0"
+                      step="1"
+                      min="0"
+                    />
+                    <select
+                      value={majorationType}
+                      onChange={e => setMajorationType(e.target.value as MajorationType)}
+                      className="px-4 py-3 bg-slate-700 border border-amber-600/40 rounded-lg text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    >
+                      <option value="fixed">FCFA</option>
+                      <option value="percentage">%</option>
+                    </select>
+                  </div>
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Montant verse</label>
+                <input
+                  type="number"
+                  value={amountPaid}
+                  onChange={e => setAmountPaid(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  placeholder="0"
+                  step="1"
+                  min="0"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">Notes (optionnel)</label>
@@ -647,6 +681,15 @@ export function NewSale({ profiles, defaultProfile }: Props) {
                   <div className="flex justify-between">
                     <span className="text-slate-400 text-sm">Remise</span>
                     <span className="font-medium text-red-400">-{formatCurrency(discountAmount)}</span>
+                  </div>
+                )}
+                {majorationAmount > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-amber-400 text-sm flex items-center gap-1.5">
+                      <TrendingUp className="w-3.5 h-3.5" />
+                      Majoration
+                    </span>
+                    <span className="font-medium text-amber-400">+{formatCurrency(majorationAmount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between pt-2 border-t border-slate-600">
