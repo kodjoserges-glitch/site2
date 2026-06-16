@@ -40,6 +40,7 @@ export function printReceipt(sale: Sale, company?: Partial<CompanyProfile>): voi
   const c = { ...defaultCompany, ...company };
   const items = sale.sale_items ?? [];
   const remaining = Math.max(0, sale.total - sale.amount_paid);
+  const changeToGive = sale.amount_paid > sale.total ? sale.amount_paid - sale.total : 0;
 
   const statusLabel = sale.payment_status === 'paid' ? 'PAYE' : sale.payment_status === 'advance' ? 'AVANCE' : 'NON PAYE';
   const statusBg = sale.payment_status === 'paid' ? '#16a34a' : sale.payment_status === 'advance' ? '#d97706' : '#dc2626';
@@ -242,6 +243,7 @@ export function printReceipt(sale: Sale, company?: Partial<CompanyProfile>): voi
     ${sep()}
     ${row('Verse', fmt(sale.amount_paid))}
     ${row('Reste a payer', fmt(remaining), remaining > 0)}
+    ${changeToGive > 0 ? `${sep()}<tr><td style="font-weight:700;color:#059669;">MONNAIE A RENDRE</td><td style="text-align:right;font-weight:700;color:#059669;font-size:12pt;">${fmt(changeToGive)}</td></tr>` : ''}
   </table>
 
   <span class="status-badge">${statusLabel}</span>

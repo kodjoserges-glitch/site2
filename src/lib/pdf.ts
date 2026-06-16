@@ -183,9 +183,23 @@ export function generateInvoicePDF(sale: Sale, company?: Partial<CompanyProfile>
   doc.setTextColor(100, 116, 139);
   doc.text('Reste a payer:', pageWidth - 90, finalY + sepOffset + 28);
   doc.setTextColor(remaining > 0 ? 234 : 16, remaining > 0 ? 88 : 185, remaining > 0 ? 12 : 129);
-  doc.text(formatCurrency(remaining), pageWidth - 20, finalY + sepOffset + 28, { align: 'right' });
+  doc.text(formatCurrency(Math.max(0, remaining)), pageWidth - 20, finalY + sepOffset + 28, { align: 'right' });
 
-  const statusY = finalY + sepOffset + 40;
+  const changeToGive = sale.amount_paid > sale.total ? sale.amount_paid - sale.total : 0;
+  let statusOffsetExtra = 0;
+  if (changeToGive > 0) {
+    statusOffsetExtra = 10;
+    doc.setFillColor(209, 250, 229);
+    doc.roundedRect(pageWidth - 92, finalY + sepOffset + 32, 72, 10, 2, 2, 'F');
+    doc.setTextColor(100, 116, 139);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Monnaie a rendre:', pageWidth - 90, finalY + sepOffset + 39);
+    doc.setTextColor(5, 150, 105);
+    doc.text(formatCurrency(changeToGive), pageWidth - 20, finalY + sepOffset + 39, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+  }
+
+  const statusY = finalY + sepOffset + 40 + statusOffsetExtra;
   const statusText = sale.payment_status === 'paid' ? 'PAYE' : sale.payment_status === 'advance' ? 'AVANCE' : 'NON PAYE';
   const statusColor: [number, number, number] = sale.payment_status === 'paid' ? [16, 185, 129] : sale.payment_status === 'advance' ? [234, 179, 8] : [239, 68, 68];
   doc.setFillColor(...statusColor);

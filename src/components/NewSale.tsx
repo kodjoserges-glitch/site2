@@ -112,6 +112,7 @@ export function NewSale({ profiles, defaultProfile, currentUser }: Props) {
   const grandTotal = Math.max(0, Number((linesSubtotal - discountAmount + majorationAmount).toFixed(2)));
   const amountPaidNum = parseFloat(amountPaid) || 0;
   const remaining = Math.max(0, Number((grandTotal - amountPaidNum).toFixed(2)));
+  const changeToGive = amountPaidNum > grandTotal ? Number((amountPaidNum - grandTotal).toFixed(2)) : 0;
   const paymentStatus: PaymentStatus =
     grandTotal > 0 && amountPaidNum >= grandTotal ? 'paid' : amountPaidNum > 0 ? 'advance' : 'unpaid';
 
@@ -710,6 +711,12 @@ export function NewSale({ profiles, defaultProfile, currentUser }: Props) {
                   <span className="text-slate-400 text-sm">Reste a payer</span>
                   <span className="font-bold text-orange-400">{formatCurrency(remaining)}</span>
                 </div>
+                {changeToGive > 0 && (
+                  <div className="flex justify-between items-center bg-emerald-600/10 border border-emerald-600/30 rounded-lg px-3 py-2">
+                    <span className="text-emerald-400 text-sm font-semibold">Monnaie a rendre</span>
+                    <span className="font-bold text-emerald-400 text-lg">{formatCurrency(changeToGive)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-slate-400 text-sm">Statut</span>
                   <span className={`px-2 py-1 rounded text-xs font-medium ${paymentStatus === 'paid' ? 'bg-green-600 text-green-100' : paymentStatus === 'advance' ? 'bg-yellow-600 text-yellow-100' : 'bg-red-600 text-red-100'}`}>
