@@ -26,7 +26,7 @@ export function formatDateShort(date: string): string {
 }
 
 export function calculateSurface(width: number, length: number): number {
-  return Number((width * length).toFixed(2));
+  return Number((width * length).toFixed(4));
 }
 
 export function calculateTotal(
