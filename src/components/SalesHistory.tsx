@@ -15,6 +15,9 @@ import {
   Eye,
   EyeOff,
   AlertTriangle,
+  BadgeCheck,
+  CreditCard,
+  CheckCircle2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Sale, CompanyProfile, UserProfile } from '../types';
@@ -35,6 +38,10 @@ interface DeleteRequest {
   total: number;
 }
 
+interface SettleRequest {
+  sale: Sale;
+}
+
 export function SalesHistory({ profiles, defaultProfile, currentUser }: Props) {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +53,13 @@ export function SalesHistory({ profiles, defaultProfile, currentUser }: Props) {
   const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Settle modal state
+  const [settleRequest, setSettleRequest] = useState<SettleRequest | null>(null);
+  const [settleAmount, setSettleAmount] = useState('');
+  const [settleDate, setSettleDate] = useState('');
+  const [settleLoading, setSettleLoading] = useState(false);
+  const [settleError, setSettleError] = useState('');
 
   const canDelete = currentUser.role === 'admin' || currentUser.role === 'manager';
 
@@ -77,6 +91,7 @@ export function SalesHistory({ profiles, defaultProfile, currentUser }: Props) {
     }
   }
 
+  // ---- Delete flow ----
   function requestDelete(sale: Sale) {
     if (!canDelete) return;
     setDeleteRequest({
@@ -102,7 +117,6 @@ export function SalesHistory({ profiles, defaultProfile, currentUser }: Props) {
     setDeleteError('');
 
     try {
-      // Verify the manager/admin's own password
       const { error: authError } = await supabase.auth.signInWithPassword({
         email: currentUser.email,
         password: deletePassword,
@@ -114,13 +128,12 @@ export function SalesHistory({ profiles, defaultProfile, currentUser }: Props) {
         return;
       }
 
-      // Password verified — proceed with deletion
-      const { error: deleteError } = await supabase
+      const { error: delError } = await supabase
         .from('sales')
         .delete()
         .eq('id', deleteRequest.saleId);
 
-      if (deleteError) throw deleteError;
+      if (delError) throw delError;
 
       setSales(prev => prev.filter(s => s.id !== deleteRequest.saleId));
       cancelDelete();
@@ -129,6 +142,67 @@ export function SalesHistory({ profiles, defaultProfile, currentUser }: Props) {
       setDeleteError('Erreur lors de la suppression. Reessayez.');
     } finally {
       setDeleteLoading(false);
+    }
+  }
+
+  // ---- Settle flow ----
+  function openSettle(sale: Sale) {
+    const remaining = Math.max(0, sale.total - sale.amount_paid);
+    setSettleRequest({ sale });
+    setSettleAmount(String(remaining));
+    setSettleDate(new Date().toISOString().slice(0, 16));
+    setSettleError('');
+  }
+
+  function cancelSettle() {
+    setSettleRequest(null);
+    setSettleAmount('');
+    setSettleDate('');
+    setSettleError('');
+  }
+
+  async function confirmSettle() {
+    if (!settleRequest) return;
+    const addedAmount = parseFloat(settleAmount) || 0;
+    if (addedAmount <= 0) {
+      setSettleError('Veuillez saisir un montant valide.');
+      return;
+    }
+
+    setSettleLoading(true);
+    setSettleError('');
+
+    try {
+      const { sale } = settleRequest;
+      const newAmountPaid = sale.amount_paid + addedAmount;
+      const newStatus: 'paid' | 'advance' | 'unpaid' =
+        newAmountPaid >= sale.total ? 'paid' : newAmountPaid > 0 ? 'advance' : 'unpaid';
+      const settled = newStatus === 'paid' ? new Date(settleDate).toISOString() : null;
+
+      const { error } = await supabase
+        .from('sales')
+        .update({
+          amount_paid: newAmountPaid,
+          payment_status: newStatus,
+          settled_at: settled,
+        })
+        .eq('id', sale.id);
+
+      if (error) throw error;
+
+      setSales(prev =>
+        prev.map(s =>
+          s.id === sale.id
+            ? { ...s, amount_paid: newAmountPaid, payment_status: newStatus, settled_at: settled }
+            : s
+        )
+      );
+      cancelSettle();
+    } catch (err) {
+      console.error(err);
+      setSettleError('Erreur lors de la mise a jour. Reessayez.');
+    } finally {
+      setSettleLoading(false);
     }
   }
 
@@ -161,7 +235,6 @@ export function SalesHistory({ profiles, defaultProfile, currentUser }: Props) {
       {deleteRequest && (
         <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
           <div className="bg-slate-800 rounded-2xl max-w-md w-full overflow-hidden border border-red-600/40 shadow-2xl">
-            {/* Header */}
             <div className="bg-red-600/15 border-b border-red-600/30 p-5 flex items-start gap-4">
               <div className="w-11 h-11 bg-red-600/25 rounded-full flex items-center justify-center shrink-0">
                 <ShieldAlert className="w-6 h-6 text-red-400" />
@@ -174,7 +247,6 @@ export function SalesHistory({ profiles, defaultProfile, currentUser }: Props) {
               </div>
             </div>
 
-            {/* Sale info */}
             <div className="px-5 pt-5 pb-3">
               <div className="bg-slate-700/50 rounded-xl p-4 space-y-2 text-sm">
                 <div className="flex justify-between">
@@ -197,7 +269,6 @@ export function SalesHistory({ profiles, defaultProfile, currentUser }: Props) {
               </div>
             </div>
 
-            {/* Password input */}
             <div className="px-5 pb-5 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">
@@ -243,14 +314,124 @@ export function SalesHistory({ profiles, defaultProfile, currentUser }: Props) {
                   disabled={deleteLoading || !deletePassword.trim()}
                   className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                 >
-                  {deleteLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4" />
-                  )}
+                  {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                   Confirmer la suppression
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settle Modal */}
+      {settleRequest && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-2xl max-w-md w-full overflow-hidden border border-green-600/40 shadow-2xl">
+            {/* Header */}
+            <div className="bg-green-600/15 border-b border-green-600/30 p-5 flex items-start gap-4">
+              <div className="w-11 h-11 bg-green-600/25 rounded-full flex items-center justify-center shrink-0">
+                <CreditCard className="w-6 h-6 text-green-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Solde client</h3>
+                <p className="text-sm text-slate-400 mt-0.5">Enregistrer le paiement du client</p>
+              </div>
+            </div>
+
+            <div className="px-5 pt-5 pb-3 space-y-4">
+              {/* Sale recap */}
+              <div className="bg-slate-700/50 rounded-xl p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Facture</span>
+                  <span className="font-mono text-blue-400 font-medium">{settleRequest.sale.invoice_number}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Client</span>
+                  <span className="text-white font-medium">{settleRequest.sale.client_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Total facture</span>
+                  <span className="text-green-400 font-bold">{formatCurrency(settleRequest.sale.total)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Deja verse</span>
+                  <span className="text-white font-medium">{formatCurrency(settleRequest.sale.amount_paid)}</span>
+                </div>
+                <div className="flex justify-between border-t border-slate-600 pt-2">
+                  <span className="text-amber-400 font-medium">Reste a payer</span>
+                  <span className="text-amber-400 font-bold">
+                    {formatCurrency(Math.max(0, settleRequest.sale.total - settleRequest.sale.amount_paid))}
+                  </span>
+                </div>
+              </div>
+
+              {/* Amount input */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                  Montant recu (FCFA) *
+                </label>
+                <input
+                  type="number"
+                  value={settleAmount}
+                  onChange={e => { setSettleAmount(e.target.value); setSettleError(''); }}
+                  className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                  placeholder="0"
+                  min="1"
+                  step="1"
+                  autoFocus
+                  disabled={settleLoading}
+                />
+              </div>
+
+              {/* Settle date */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4" />
+                  Date du solde *
+                </label>
+                <input
+                  type="datetime-local"
+                  value={settleDate}
+                  onChange={e => setSettleDate(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                  disabled={settleLoading}
+                />
+              </div>
+
+              {/* Preview new total */}
+              {parseFloat(settleAmount) > 0 && (
+                <div className="bg-slate-700/40 rounded-lg px-4 py-3 flex justify-between items-center text-sm">
+                  <span className="text-slate-400">Nouveau montant verse</span>
+                  <span className="text-white font-bold text-base">
+                    {formatCurrency(settleRequest.sale.amount_paid + (parseFloat(settleAmount) || 0))}
+                  </span>
+                </div>
+              )}
+
+              {settleError && (
+                <p className="text-sm text-red-400 flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  {settleError}
+                </p>
+              )}
+            </div>
+
+            <div className="px-5 pb-5 flex gap-3">
+              <button
+                onClick={cancelSettle}
+                disabled={settleLoading}
+                className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmSettle}
+                disabled={settleLoading || !settleAmount || parseFloat(settleAmount) <= 0}
+                className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                {settleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                Enregistrer le solde
+              </button>
             </div>
           </div>
         </div>
@@ -394,105 +575,125 @@ export function SalesHistory({ profiles, defaultProfile, currentUser }: Props) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700">
-                {sales.map((sale) => (
-                  <tr key={sale.id} className="hover:bg-slate-700/30 transition-colors">
-                    <td className="py-3 px-4 text-sm text-slate-300">
-                      {formatDate(sale.created_at)}
-                    </td>
-                    <td className="py-3 px-4 text-sm font-mono text-blue-400">
-                      {sale.invoice_number}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-white font-medium">
-                      {sale.client_name}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-slate-300">
-                      {sale.sale_items && sale.sale_items.length > 1 ? (
-                        <div className="space-y-0.5">
-                          {sale.sale_items.map((item, i) => (
-                            <div key={item.id ?? i} className="text-xs text-slate-400 truncate max-w-[160px]">
-                              {item.article_name}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        sale.article_name
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-right text-slate-300">
-                      {sale.sale_items && sale.sale_items.length > 1 ? (
-                        <span className="text-xs text-slate-500">{sale.sale_items.length} articles</span>
-                      ) : sale.pricing_type === 'format' ? (
-                        <span className="inline-flex items-center gap-1">
-                          <Ruler className="w-3 h-3 text-blue-400" />
-                          {(sale.width * 100).toFixed(0)}×{(sale.length * 100).toFixed(0)} cm
-                        </span>
-                      ) : (
-                        `${sale.width}m × ${sale.length}m`
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-right font-medium">
-                      {sale.sale_items && sale.sale_items.length > 1 ? (
-                        <span className="text-slate-500">—</span>
-                      ) : sale.pricing_type === 'format' ? (
-                        <span className="text-blue-400">{sale.quantity} unité(s)</span>
-                      ) : (
-                        <span className="text-cyan-400">{sale.surface} m²</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-right text-green-400 font-bold">
-                      {formatCurrency(sale.total)}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
-                        sale.payment_status === 'paid'
-                          ? 'bg-green-600/20 text-green-400'
-                          : sale.payment_status === 'advance'
-                          ? 'bg-yellow-600/20 text-yellow-400'
-                          : 'bg-red-600/20 text-red-400'
-                      }`}>
-                        {sale.payment_status === 'paid'
-                          ? 'Paye'
-                          : sale.payment_status === 'advance'
-                          ? 'Avance'
-                          : 'Non paye'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => handlePrintInvoice(sale)}
-                          className="p-1.5 hover:bg-blue-600/20 rounded text-slate-300 hover:text-blue-400 transition-colors"
-                          title="Imprimer ticket thermique"
-                        >
-                          <Printer className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDownloadPDF(sale)}
-                          className="p-1.5 hover:bg-slate-600 rounded text-slate-400 hover:text-white transition-colors"
-                          title="Telecharger PDF A4"
-                        >
-                          <FileDown className="w-4 h-4" />
-                        </button>
-                        {canDelete ? (
-                          <button
-                            onClick={() => requestDelete(sale)}
-                            className="p-1.5 hover:bg-red-600/20 rounded text-slate-400 hover:text-red-400 transition-colors"
-                            title="Supprimer (autorisation requise)"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                {sales.map((sale) => {
+                  const isPending = sale.payment_status === 'unpaid' || sale.payment_status === 'advance';
+                  return (
+                    <tr key={sale.id} className="hover:bg-slate-700/30 transition-colors">
+                      <td className="py-3 px-4 text-sm text-slate-300">
+                        {formatDate(sale.created_at)}
+                      </td>
+                      <td className="py-3 px-4 text-sm font-mono text-blue-400">
+                        {sale.invoice_number}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-white font-medium">
+                        {sale.client_name}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-slate-300">
+                        {sale.sale_items && sale.sale_items.length > 1 ? (
+                          <div className="space-y-0.5">
+                            {sale.sale_items.map((item, i) => (
+                              <div key={item.id ?? i} className="text-xs text-slate-400 truncate max-w-[160px]">
+                                {item.article_name}
+                              </div>
+                            ))}
+                          </div>
                         ) : (
-                          <span
-                            className="p-1.5 text-slate-600 cursor-not-allowed"
-                            title="Suppression non autorisee - contacter un responsable"
-                          >
-                            <Lock className="w-4 h-4" />
-                          </span>
+                          sale.article_name
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right text-slate-300">
+                        {sale.sale_items && sale.sale_items.length > 1 ? (
+                          <span className="text-xs text-slate-500">{sale.sale_items.length} articles</span>
+                        ) : sale.pricing_type === 'format' ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Ruler className="w-3 h-3 text-blue-400" />
+                            {(sale.width * 100).toFixed(0)}×{(sale.length * 100).toFixed(0)} cm
+                          </span>
+                        ) : (
+                          `${sale.width}m × ${sale.length}m`
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right font-medium">
+                        {sale.sale_items && sale.sale_items.length > 1 ? (
+                          <span className="text-slate-500">—</span>
+                        ) : sale.pricing_type === 'format' ? (
+                          <span className="text-blue-400">{sale.quantity} unité(s)</span>
+                        ) : (
+                          <span className="text-cyan-400">{sale.surface} m²</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right text-green-400 font-bold">
+                        {formatCurrency(sale.total)}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
+                            sale.payment_status === 'paid'
+                              ? 'bg-green-600/20 text-green-400'
+                              : sale.payment_status === 'advance'
+                              ? 'bg-yellow-600/20 text-yellow-400'
+                              : 'bg-red-600/20 text-red-400'
+                          }`}>
+                            {sale.payment_status === 'paid'
+                              ? 'Paye'
+                              : sale.payment_status === 'advance'
+                              ? 'Avance'
+                              : 'Non paye'}
+                          </span>
+                          {sale.payment_status === 'paid' && sale.settled_at && (
+                            <span className="text-xs text-slate-500 flex items-center gap-0.5">
+                              <BadgeCheck className="w-3 h-3 text-green-600" />
+                              {new Date(sale.settled_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => handlePrintInvoice(sale)}
+                            className="p-1.5 hover:bg-blue-600/20 rounded text-slate-300 hover:text-blue-400 transition-colors"
+                            title="Imprimer ticket thermique"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDownloadPDF(sale)}
+                            className="p-1.5 hover:bg-slate-600 rounded text-slate-400 hover:text-white transition-colors"
+                            title="Telecharger PDF A4"
+                          >
+                            <FileDown className="w-4 h-4" />
+                          </button>
+                          {isPending && (
+                            <button
+                              onClick={() => openSettle(sale)}
+                              className="p-1.5 hover:bg-green-600/20 rounded text-slate-400 hover:text-green-400 transition-colors"
+                              title="Solder la facture"
+                            >
+                              <CreditCard className="w-4 h-4" />
+                            </button>
+                          )}
+                          {canDelete ? (
+                            <button
+                              onClick={() => requestDelete(sale)}
+                              className="p-1.5 hover:bg-red-600/20 rounded text-slate-400 hover:text-red-400 transition-colors"
+                              title="Supprimer (autorisation requise)"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <span
+                              className="p-1.5 text-slate-600 cursor-not-allowed"
+                              title="Suppression non autorisee - contacter un responsable"
+                            >
+                              <Lock className="w-4 h-4" />
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

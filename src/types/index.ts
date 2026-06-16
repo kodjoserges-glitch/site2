@@ -103,6 +103,7 @@ export interface Sale {
   notes: string | null;
   pricing_type: PricingType;
   created_at: string;
+  settled_at: string | null;
   sale_items?: SaleItem[];
 }
 
