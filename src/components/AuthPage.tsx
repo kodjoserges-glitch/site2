@@ -179,7 +179,7 @@ export function AuthPage() {
 
             {mode === 'register' && (
               <p className="text-center text-xs text-slate-500">
-                Le premier compte cree devient Administrateur.
+                Votre compte sera soumis a la validation d'un administrateur avant de pouvoir acceder a l'application.
               </p>
             )}
           </form>

@@ -109,11 +109,14 @@ export type DiscountType = 'percentage' | 'fixed';
 
 export type UserRole = 'admin' | 'manager' | 'vendeur';
 
+export type UserStatus = 'pending' | 'approved' | 'rejected';
+
 export interface UserProfile {
   id: string;
   full_name: string;
   email: string;
   role: UserRole;
+  status: UserStatus;
   created_at: string;
   updated_at: string;
 }

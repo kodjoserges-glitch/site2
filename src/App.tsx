@@ -155,6 +155,72 @@ export default function App() {
     );
   }
 
+  if (userProfile.status === 'pending') {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="w-full max-w-md text-center space-y-6">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-yellow-600/20 rounded-full mb-2">
+            <Loader2 className="w-10 h-10 text-yellow-400 animate-spin" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white mb-2">Compte en attente</h1>
+            <p className="text-slate-400 text-sm leading-relaxed">
+              Votre inscription a bien ete enregistree.<br />
+              Un administrateur doit valider votre compte avant que vous puissiez acceder a l'application.
+            </p>
+          </div>
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 text-left space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-400">Nom</span>
+              <span className="text-white font-medium">{userProfile.full_name || '—'}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-400">Email</span>
+              <span className="text-white font-medium">{userProfile.email}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-400">Statut</span>
+              <span className="px-2 py-0.5 bg-yellow-600/20 text-yellow-400 rounded text-xs font-medium border border-yellow-600/30">En attente</span>
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="flex items-center justify-center gap-2 w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl transition-colors font-medium"
+          >
+            <LogOut className="w-4 h-4" />
+            Se deconnecter
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (userProfile.status === 'rejected') {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="w-full max-w-md text-center space-y-6">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-red-600/20 rounded-full mb-2">
+            <AlertTriangle className="w-10 h-10 text-red-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white mb-2">Acces refuse</h1>
+            <p className="text-slate-400 text-sm leading-relaxed">
+              Votre demande d'acces a ete refusee par l'administrateur.<br />
+              Contactez l'administrateur de votre imprimerie pour plus d'informations.
+            </p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="flex items-center justify-center gap-2 w-full py-3 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/30 rounded-xl transition-colors font-medium"
+          >
+            <LogOut className="w-4 h-4" />
+            Se deconnecter
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const allowedTabs = ROLE_TABS[userProfile.role];
   const displayName = defaultProfile?.company_name || 'Imprimerie Pro';
   const displaySlogan = defaultProfile?.slogan || 'Systeme de gestion';
