@@ -32,8 +32,9 @@ interface Props {
 }
 
 interface DeleteRequest {
-  saleIds: string[];
-  count: number;
+  saleId: string;
+  invoiceNumber: string;
+  clientName: string;
   total: number;
 }
 
@@ -53,9 +54,6 @@ export function SalesHistory({ defaultProfile, currentUser }: Props) {
   const [deleteError, setDeleteError] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Multi-select state
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
   // Settle modal state
   const [settleRequest, setSettleRequest] = useState<SettleRequest | null>(null);
   const [settleAmount, setSettleAmount] = useState('');
@@ -66,7 +64,6 @@ export function SalesHistory({ defaultProfile, currentUser }: Props) {
   const canDelete = currentUser.role === 'admin' || currentUser.role === 'manager';
 
   useEffect(() => {
-    clearSelection();
     fetchSales();
   }, [filterDate]);
 
@@ -94,49 +91,14 @@ export function SalesHistory({ defaultProfile, currentUser }: Props) {
     }
   }
 
-  // ---- Selection ----
-  function toggleSelect(saleId: string) {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(saleId)) next.delete(saleId);
-      else next.add(saleId);
-      return next;
-    });
-  }
-
-  function toggleSelectAll() {
-    if (selectedIds.size === sales.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(sales.map(s => s.id)));
-    }
-  }
-
-  function clearSelection() {
-    setSelectedIds(new Set());
-  }
-
   // ---- Delete flow ----
   function requestDelete(sale: Sale) {
     if (!canDelete) return;
     setDeleteRequest({
-      saleIds: [sale.id],
-      count: 1,
+      saleId: sale.id,
+      invoiceNumber: sale.invoice_number,
+      clientName: sale.client_name,
       total: sale.total,
-    });
-    setDeletePassword('');
-    setDeleteError('');
-    setShowDeletePassword(false);
-  }
-
-  function requestBulkDelete() {
-    if (!canDelete || selectedIds.size === 0) return;
-    const selectedSales = sales.filter(s => selectedIds.has(s.id));
-    const total = selectedSales.reduce((sum, s) => sum + s.total, 0);
-    setDeleteRequest({
-      saleIds: Array.from(selectedIds),
-      count: selectedIds.size,
-      total,
     });
     setDeletePassword('');
     setDeleteError('');
@@ -169,13 +131,11 @@ export function SalesHistory({ defaultProfile, currentUser }: Props) {
       const { error: delError } = await supabase
         .from('sales')
         .delete()
-        .in('id', deleteRequest.saleIds);
+        .eq('id', deleteRequest.saleId);
 
       if (delError) throw delError;
 
-      const deletedIds = new Set(deleteRequest.saleIds);
-      setSales(prev => prev.filter(s => !deletedIds.has(s.id)));
-      clearSelection();
+      setSales(prev => prev.filter(s => s.id !== deleteRequest.saleId));
       cancelDelete();
     } catch (err) {
       console.error(err);
@@ -306,18 +266,22 @@ export function SalesHistory({ defaultProfile, currentUser }: Props) {
             <div className="px-5 pt-5 pb-3">
               <div className="bg-slate-700/50 rounded-xl p-4 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Ventes selectionnees</span>
-                  <span className="text-white font-bold">{deleteRequest.count}</span>
+                  <span className="text-slate-400">Facture</span>
+                  <span className="font-mono text-blue-400 font-medium">{deleteRequest.invoiceNumber}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Montant total</span>
+                  <span className="text-slate-400">Client</span>
+                  <span className="text-white font-medium">{deleteRequest.clientName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Montant</span>
                   <span className="text-green-400 font-bold">{formatCurrency(deleteRequest.total)}</span>
                 </div>
               </div>
 
               <div className="mt-4 flex items-start gap-2 text-xs text-amber-400 bg-amber-600/10 border border-amber-600/20 rounded-lg p-3">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>Cette action est irréversible. {deleteRequest.count > 1 ? `${deleteRequest.count} ventes seront` : 'La vente sera'} definitivement supprimee(s).</span>
+                <span>Cette action est irréversible. La vente sera definitivement supprimee.</span>
               </div>
             </div>
 
@@ -367,7 +331,7 @@ export function SalesHistory({ defaultProfile, currentUser }: Props) {
                   className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                 >
                   {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                  {deleteRequest.count > 1 ? `Supprimer ${deleteRequest.count} ventes` : 'Confirmer la suppression'}
+                  Confirmer la suppression
                 </button>
               </div>
             </div>
@@ -563,7 +527,7 @@ export function SalesHistory({ defaultProfile, currentUser }: Props) {
       </div>
 
       {/* Actions */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap gap-2">
         <button
           onClick={handleExportCSV}
           className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-medium text-white transition-colors"
@@ -571,41 +535,6 @@ export function SalesHistory({ defaultProfile, currentUser }: Props) {
           <Download className="w-4 h-4" />
           Exporter CSV
         </button>
-        {canDelete && sales.length > 0 && (
-          <button
-            onClick={toggleSelectAll}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium text-slate-300 transition-colors"
-          >
-            {selectedIds.size === sales.length && sales.length > 0 ? (
-              <>
-                <span className="w-4 h-4 flex items-center justify-center rounded bg-blue-600 text-white text-xs">✓</span>
-                Tout désélectionner
-              </>
-            ) : (
-              <>
-                <span className="w-4 h-4 flex items-center justify-center rounded border-2 border-slate-500" />
-                Tout sélectionner
-              </>
-            )}
-          </button>
-        )}
-        {canDelete && selectedIds.size > 0 && (
-          <button
-            onClick={requestBulkDelete}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium text-white transition-colors shadow-lg shadow-red-600/20"
-          >
-            <Trash2 className="w-4 h-4" />
-            Supprimer ({selectedIds.size})
-          </button>
-        )}
-        {selectedIds.size > 0 && (
-          <button
-            onClick={clearSelection}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium text-slate-400 transition-colors"
-          >
-            Annuler la sélection
-          </button>
-        )}
       </div>
 
       {/* Permission notice for vendeur */}
@@ -632,22 +561,6 @@ export function SalesHistory({ defaultProfile, currentUser }: Props) {
             <table className="w-full">
               <thead className="bg-slate-700/50">
                 <tr>
-                  {canDelete && (
-                    <th className="py-3 px-3 w-10">
-                      <button
-                        onClick={toggleSelectAll}
-                        className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                          selectedIds.size === sales.length && sales.length > 0
-                            ? 'bg-blue-600 border-blue-600 text-white'
-                            : selectedIds.size > 0
-                            ? 'bg-blue-600/30 border-blue-500 text-white'
-                            : 'border-slate-500 hover:border-slate-400'
-                        }`}
-                      >
-                        {selectedIds.size === sales.length && sales.length > 0 ? '✓' : selectedIds.size > 0 ? '−' : ''}
-                      </button>
-                    </th>
-                  )}
                   <th className="text-left py-3 px-4 text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Date et Heure
                   </th>
@@ -684,21 +597,7 @@ export function SalesHistory({ defaultProfile, currentUser }: Props) {
                 {sales.map((sale) => {
                   const isPending = sale.payment_status === 'unpaid' || sale.payment_status === 'advance';
                   return (
-                    <tr key={sale.id} className={`hover:bg-slate-700/30 transition-colors ${selectedIds.has(sale.id) ? 'bg-red-600/5' : ''}`}>
-                      {canDelete && (
-                        <td className="py-3 px-3 text-center">
-                          <button
-                            onClick={() => toggleSelect(sale.id)}
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                              selectedIds.has(sale.id)
-                                ? 'bg-blue-600 border-blue-600 text-white'
-                                : 'border-slate-600 hover:border-slate-400'
-                            }`}
-                          >
-                            {selectedIds.has(sale.id) ? '✓' : ''}
-                          </button>
-                        </td>
-                      )}
+                    <tr key={sale.id} className="hover:bg-slate-700/30 transition-colors">
                       <td className="py-3 px-4 text-sm text-slate-300">
                         {formatDate(sale.created_at)}
                       </td>

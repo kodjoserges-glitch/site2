@@ -12,6 +12,7 @@ import {
   Layers,
   AlertCircle,
   Trash2,
+  XCircle,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Sale, UserRole } from '../types';
@@ -117,11 +118,49 @@ export function PrintQueue({ userRole, userName }: Props) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'pending' | 'printed' | 'reprint_requested' | 'all'>('pending');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   useEffect(() => {
+    setSelectedIds(new Set());
     fetchCounts();
     fetchSales();
   }, [filter]);
+
+  // ---- Selection ----
+  function toggleSelect(saleId: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(saleId)) next.delete(saleId);
+      else next.add(saleId);
+      return next;
+    });
+  }
+
+  function toggleSelectGroup(_articleName: string, saleIds: string[]) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      const allSelected = saleIds.every(id => next.has(id));
+      if (allSelected) {
+        saleIds.forEach(id => next.delete(id));
+      } else {
+        saleIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === sales.length && sales.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(sales.map(s => s.id)));
+    }
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
 
   async function fetchCounts() {
     try {
@@ -249,11 +288,36 @@ export function PrintQueue({ userRole, userName }: Props) {
         .eq('id', saleId);
       if (error) throw error;
       setSales(prev => prev.filter(s => s.id !== saleId));
+      fetchCounts();
     } catch (err) {
       console.error('Error deleting sale:', err);
       alert('Suppression impossible. Vérifiez vos droits ou réessayez.');
     } finally {
       setUpdatingId(null);
+    }
+  }
+
+  async function bulkDelete() {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    if (!window.confirm(`Supprimer définitivement ${count} commande(s) sélectionnée(s) ?`)) return;
+
+    setBulkDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const { error } = await supabase
+        .from('sales')
+        .delete()
+        .in('id', ids);
+      if (error) throw error;
+      setSales(prev => prev.filter(s => !selectedIds.has(s.id)));
+      clearSelection();
+      fetchCounts();
+    } catch (err) {
+      console.error('Error bulk deleting:', err);
+      alert('Suppression impossible. Vérifiez vos droits ou réessayez.');
+    } finally {
+      setBulkDeleting(false);
     }
   }
 
@@ -380,6 +444,48 @@ export function PrintQueue({ userRole, userName }: Props) {
               </button>
             </div>
           </div>
+
+          {/* Bulk action bar */}
+          {canDelete && sales.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 px-6 py-3 border-t border-slate-700 bg-slate-750/30">
+              <button
+                onClick={toggleSelectAll}
+                className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium text-slate-300 transition-colors"
+              >
+                {selectedIds.size === sales.length && sales.length > 0 ? (
+                  <>
+                    <span className="w-4 h-4 flex items-center justify-center rounded bg-blue-600 text-white text-xs">✓</span>
+                    Tout désélectionner
+                  </>
+                ) : (
+                  <>
+                    <span className="w-4 h-4 flex items-center justify-center rounded border-2 border-slate-500" />
+                    Tout sélectionner
+                  </>
+                )}
+              </button>
+              {selectedIds.size > 0 && (
+                <>
+                  <button
+                    onClick={bulkDelete}
+                    disabled={bulkDeleting}
+                    className="flex items-center gap-2 px-4 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg text-sm font-medium text-white transition-colors shadow-lg shadow-red-600/20"
+                  >
+                    {bulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    Supprimer ({selectedIds.size})
+                  </button>
+                  <button
+                    onClick={clearSelection}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium text-slate-400 transition-colors"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    Annuler
+                  </button>
+                  <span className="text-xs text-slate-400 ml-1">{selectedIds.size} sélectionnée(s)</span>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -408,11 +514,24 @@ export function PrintQueue({ userRole, userName }: Props) {
                 className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden"
               >
                 {/* Article group header */}
-                <button
-                  onClick={() => toggleGroup(group.articleName)}
+                <div
                   className="w-full flex items-center justify-between px-5 py-4 bg-slate-700/40 hover:bg-slate-700/60 transition-colors"
                 >
                   <div className="flex items-center gap-3">
+                    {canDelete && (
+                      <button
+                        onClick={() => toggleSelectGroup(group.articleName, group.orders.map(o => o.saleId))}
+                        className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all shrink-0 ${
+                          group.orders.every(o => selectedIds.has(o.saleId))
+                            ? 'bg-blue-600 border-blue-600 text-white'
+                            : group.orders.some(o => selectedIds.has(o.saleId))
+                            ? 'bg-blue-600/30 border-blue-500 text-white'
+                            : 'border-slate-500 hover:border-slate-400'
+                        }`}
+                      >
+                        {group.orders.every(o => selectedIds.has(o.saleId)) ? '✓' : group.orders.some(o => selectedIds.has(o.saleId)) ? '−' : ''}
+                      </button>
+                    )}
                     <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
                       groupReprint > 0 ? 'bg-orange-600/20' : groupPending > 0 ? 'bg-cyan-600/20' : 'bg-green-600/20'
                     }`}>
@@ -420,7 +539,7 @@ export function PrintQueue({ userRole, userName }: Props) {
                         groupReprint > 0 ? 'text-orange-400' : groupPending > 0 ? 'text-cyan-400' : 'text-green-400'
                       }`} />
                     </div>
-                    <div className="text-left">
+                    <button onClick={() => toggleGroup(group.articleName)} className="text-left">
                       <h3 className="text-sm font-bold text-white">{group.articleName}</h3>
                       <p className="text-xs text-slate-400">
                         {group.orders.length} commande(s) · {totalQty} unite(s)
@@ -428,7 +547,7 @@ export function PrintQueue({ userRole, userName }: Props) {
                         {groupPrinted > 0 && <span className="text-green-400"> · {groupPrinted} imprime(s)</span>}
                         {groupReprint > 0 && <span className="text-orange-400"> · {groupReprint} reimpression(s)</span>}
                       </p>
-                    </div>
+                    </button>
                   </div>
                   <div className="flex items-center gap-3">
                     {groupReprint > 0 && (
@@ -441,9 +560,11 @@ export function PrintQueue({ userRole, userName }: Props) {
                         {groupPending} a imprimer
                       </span>
                     )}
-                    <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                    <button onClick={() => toggleGroup(group.articleName)}>
+                      <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                    </button>
                   </div>
-                </button>
+                </div>
 
                 {/* Orders list under this article */}
                 {!isCollapsed && (
@@ -456,11 +577,25 @@ export function PrintQueue({ userRole, userName }: Props) {
                         <div
                           key={`${order.saleId}-${idx}`}
                           className={`flex items-center gap-4 px-5 py-3 transition-all ${
-                            isReprintRequested
+                            selectedIds.has(order.saleId) ? 'bg-blue-600/10' : isReprintRequested
                               ? 'bg-orange-600/5 hover:bg-orange-600/10'
                               : isPrinted ? 'opacity-60' : 'hover:bg-slate-700/20'
                           }`}
                         >
+                          {/* Checkbox */}
+                          {canDelete && (
+                            <button
+                              onClick={() => toggleSelect(order.saleId)}
+                              className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all shrink-0 ${
+                                selectedIds.has(order.saleId)
+                                  ? 'bg-blue-600 border-blue-600 text-white'
+                                  : 'border-slate-600 hover:border-slate-400'
+                              }`}
+                            >
+                              {selectedIds.has(order.saleId) ? '✓' : ''}
+                            </button>
+                          )}
+
                           {/* Sequential number */}
                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold ${
                             isReprintRequested
