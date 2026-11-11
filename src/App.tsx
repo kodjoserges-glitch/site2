@@ -25,15 +25,16 @@ import { CompanySettings } from './components/CompanySettings';
 import { UserManagement } from './components/UserManagement';
 import { AuthPage } from './components/AuthPage';
 import { Comptabilite } from './components/Comptabilite';
+import { PrintQueue } from './components/PrintQueue';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { CompanyProfile, UserProfile, UserRole } from './types';
 
-type Tab = 'sale' | 'history' | 'prices' | 'company' | 'users' | 'accounting';
+type Tab = 'sale' | 'history' | 'print' | 'prices' | 'company' | 'users' | 'accounting';
 
 const ROLE_TABS: Record<UserRole, Tab[]> = {
-  admin: ['sale', 'history', 'prices', 'company', 'users', 'accounting'],
-  manager: ['sale', 'history', 'prices', 'company', 'accounting'],
-  vendeur: ['sale'],
+  admin: ['sale', 'history', 'print', 'prices', 'company', 'users', 'accounting'],
+  manager: ['sale', 'history', 'print', 'prices', 'company', 'accounting'],
+  vendeur: ['sale', 'print'],
 };
 
 const ROLE_ICON: Record<UserRole, typeof Shield> = {
@@ -230,6 +231,7 @@ export default function App() {
   const navItems: { id: Tab; label: string; icon: typeof Calculator }[] = [
     { id: 'sale', label: 'Nouvelle Vente', icon: Calculator },
     { id: 'history', label: 'Historique', icon: History },
+    { id: 'print', label: 'Impression', icon: Printer },
     { id: 'prices', label: 'Tarifs', icon: Settings },
     { id: 'company', label: 'Entreprises', icon: Building2 },
     { id: 'users', label: 'Utilisateurs', icon: Users },
@@ -368,6 +370,7 @@ export default function App() {
         {activeTab === 'history' && (
           <SalesHistory profiles={profiles} defaultProfile={defaultProfile} currentUser={userProfile} />
         )}
+        {activeTab === 'print' && <PrintQueue />}
         {activeTab === 'prices' && <PriceManagement />}
         {activeTab === 'company' && <CompanySettings onUpdate={fetchCompanyProfiles} />}
         {activeTab === 'users' && userProfile.role === 'admin' && (

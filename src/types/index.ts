@@ -106,6 +106,8 @@ export interface Sale {
   settled_at: string | null;
   seller_id: string | null;
   seller_name: string | null;
+  print_status: 'pending' | 'printed';
+  printed_at: string | null;
   sale_items?: SaleItem[];
 }
 
