@@ -141,11 +141,13 @@ export function PrintQueue() {
         .eq('id', saleId);
       if (error) throw error;
       setSales(prev =>
-        prev.map(s =>
-          s.id === saleId
-            ? { ...s, print_status: 'printed', printed_at: new Date().toISOString() }
-            : s
-        )
+        filter === 'pending'
+          ? prev.filter(s => s.id !== saleId)
+          : prev.map(s =>
+              s.id === saleId
+                ? { ...s, print_status: 'printed', printed_at: new Date().toISOString() }
+                : s
+            )
       );
     } catch (err) {
       console.error('Error marking as printed:', err);
