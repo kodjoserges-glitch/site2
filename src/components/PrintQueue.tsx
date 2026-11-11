@@ -10,10 +10,12 @@ import {
   RotateCcw,
   ChevronDown,
   Layers,
+  AlertCircle,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Sale, SaleItem, UserRole } from '../types';
 import { formatCurrency } from '../lib/utils';
+import { sendNotification } from './NotificationBell';
 
 function formatTime(date: string): string {
   return new Intl.DateTimeFormat('fr-FR', {
@@ -36,7 +38,7 @@ interface OrderEntry {
   surface: number;
   pricingType: string;
   saleTotal: number;
-  isPrinted: boolean;
+  printStatus: 'pending' | 'printed' | 'reprint_requested';
   printedAt: string | null;
 }
 
@@ -75,7 +77,7 @@ function buildGroups(sales: Sale[]): GroupedItem[] {
         surface: e.surface,
         pricingType: e.pricingType,
         saleTotal: sale.total,
-        isPrinted: sale.print_status === 'printed',
+        printStatus: sale.print_status,
         printedAt: sale.printed_at,
       });
       map.set(e.articleName, list);
@@ -88,8 +90,8 @@ function buildGroups(sales: Sale[]): GroupedItem[] {
     groups.push({ articleName, orders });
   }
   groups.sort((a, b) => {
-    const aPending = a.orders.filter(o => !o.isPrinted).length;
-    const bPending = b.orders.filter(o => !o.isPrinted).length;
+    const aPending = a.orders.filter(o => o.printStatus === 'pending' || o.printStatus === 'reprint_requested').length;
+    const bPending = b.orders.filter(o => o.printStatus === 'pending' || o.printStatus === 'reprint_requested').length;
     if (aPending !== bPending) return bPending - aPending;
     return a.articleName.localeCompare(b.articleName);
   });
@@ -98,16 +100,19 @@ function buildGroups(sales: Sale[]): GroupedItem[] {
 
 interface Props {
   userRole: UserRole;
+  userName: string;
 }
 
 const PRINT_ROLES: UserRole[] = ['admin', 'manager', 'imprimeur'];
+const VALIDATE_ROLES: UserRole[] = ['admin', 'manager', 'vendeur'];
 
-export function PrintQueue({ userRole }: Props) {
+export function PrintQueue({ userRole, userName }: Props) {
   const canPrint = PRINT_ROLES.includes(userRole);
+  const canValidateReprint = VALIDATE_ROLES.includes(userRole);
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'pending' | 'printed' | 'all'>('pending');
+  const [filter, setFilter] = useState<'pending' | 'printed' | 'reprint_requested' | 'all'>('pending');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -126,6 +131,8 @@ export function PrintQueue({ userRole }: Props) {
         query = query.eq('print_status', 'pending');
       } else if (filter === 'printed') {
         query = query.eq('print_status', 'printed');
+      } else if (filter === 'reprint_requested') {
+        query = query.eq('print_status', 'reprint_requested');
       }
 
       const { data, error } = await query;
@@ -138,7 +145,7 @@ export function PrintQueue({ userRole }: Props) {
     }
   }
 
-  async function markAsPrinted(saleId: string) {
+  async function markAsPrinted(saleId: string, invoiceNumber: string) {
     setUpdatingId(saleId);
     try {
       const { error } = await supabase
@@ -150,13 +157,21 @@ export function PrintQueue({ userRole }: Props) {
         .eq('id', saleId);
       if (error) throw error;
       setSales(prev =>
-        filter === 'pending'
+        filter === 'pending' || filter === 'reprint_requested'
           ? prev.filter(s => s.id !== saleId)
           : prev.map(s =>
               s.id === saleId
                 ? { ...s, print_status: 'printed', printed_at: new Date().toISOString() }
                 : s
             )
+      );
+      await sendNotification(
+        'print_done',
+        'vendeur',
+        'Impression terminee',
+        `La commande N° ${invoiceNumber} a ete imprimee par ${userName}.`,
+        userName,
+        saleId
       );
     } catch (err) {
       console.error('Error marking as printed:', err);
@@ -166,7 +181,43 @@ export function PrintQueue({ userRole }: Props) {
     }
   }
 
-  async function markAsPending(saleId: string) {
+  async function requestReprint(saleId: string, invoiceNumber: string) {
+    setUpdatingId(saleId);
+    try {
+      const { error } = await supabase
+        .from('sales')
+        .update({
+          print_status: 'reprint_requested',
+          printed_at: null,
+        })
+        .eq('id', saleId);
+      if (error) throw error;
+      setSales(prev =>
+        filter === 'printed'
+          ? prev.filter(s => s.id !== saleId)
+          : prev.map(s =>
+              s.id === saleId
+                ? { ...s, print_status: 'reprint_requested' as const, printed_at: null }
+                : s
+            )
+      );
+      await sendNotification(
+        'reprint_request',
+        'vendeur',
+        'Reimpression demandee',
+        `L'imprimeur ${userName} demande une reimpression de la commande N° ${invoiceNumber}. Validez pour relancer l'impression.`,
+        userName,
+        saleId
+      );
+    } catch (err) {
+      console.error('Error requesting reprint:', err);
+      alert('Erreur lors de la demande de reimpression.');
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  async function validateReprint(saleId: string, invoiceNumber: string) {
     setUpdatingId(saleId);
     try {
       const { error } = await supabase
@@ -178,15 +229,25 @@ export function PrintQueue({ userRole }: Props) {
         .eq('id', saleId);
       if (error) throw error;
       setSales(prev =>
-        prev.map(s =>
-          s.id === saleId
-            ? { ...s, print_status: 'pending', printed_at: null }
-            : s
-        )
+        filter === 'reprint_requested'
+          ? prev.filter(s => s.id !== saleId)
+          : prev.map(s =>
+              s.id === saleId
+                ? { ...s, print_status: 'pending' as const, printed_at: null }
+                : s
+            )
+      );
+      await sendNotification(
+        'reprint_validated',
+        'imprimeur',
+        'Reimpression validee',
+        `La reimpression de la commande N° ${invoiceNumber} a ete validee par ${userName}. Elle est prête a etre imprimee.`,
+        userName,
+        saleId
       );
     } catch (err) {
-      console.error('Error marking as pending:', err);
-      alert('Erreur lors de la mise a jour du statut d\'impression.');
+      console.error('Error validating reprint:', err);
+      alert('Erreur lors de la validation de la reimpression.');
     } finally {
       setUpdatingId(null);
     }
@@ -204,6 +265,7 @@ export function PrintQueue({ userRole }: Props) {
   const groups = buildGroups(sales);
   const pendingCount = sales.filter(s => s.print_status === 'pending').length;
   const printedCount = sales.filter(s => s.print_status === 'printed').length;
+  const reprintCount = sales.filter(s => s.print_status === 'reprint_requested').length;
 
   return (
     <div className="space-y-6">
@@ -218,12 +280,12 @@ export function PrintQueue({ userRole }: Props) {
               <div>
                 <h2 className="text-lg font-bold text-white">File d'Impression</h2>
                 <p className="text-sm text-slate-400">
-                  {pendingCount} en attente · {printedCount} imprime(s) · {groups.length} article(s)
+                  {pendingCount} en attente · {printedCount} imprime(s) · {reprintCount} reimpression(s) · {groups.length} article(s)
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="flex bg-slate-700 rounded-lg p-0.5 gap-0.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex bg-slate-700 rounded-lg p-0.5 gap-0.5 flex-wrap">
                 <button
                   onClick={() => setFilter('pending')}
                   className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
@@ -243,6 +305,21 @@ export function PrintQueue({ userRole }: Props) {
                   }`}
                 >
                   Imprimees
+                </button>
+                <button
+                  onClick={() => setFilter('reprint_requested')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all relative ${
+                    filter === 'reprint_requested'
+                      ? 'bg-orange-600 text-white'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  Reimpression
+                  {reprintCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] flex items-center justify-center bg-orange-500 text-white text-[9px] font-bold rounded-full px-1">
+                      {reprintCount}
+                    </span>
+                  )}
                 </button>
                 <button
                   onClick={() => setFilter('all')}
@@ -274,13 +351,14 @@ export function PrintQueue({ userRole }: Props) {
       ) : sales.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 bg-slate-800 rounded-2xl border border-slate-700 text-slate-400">
           <Printer className="w-12 h-12 mb-4 opacity-50" />
-          <p>Aucune commande d'impression {filter === 'pending' ? 'en attente' : filter === 'printed' ? 'imprimee' : ''}</p>
+          <p>Aucune commande d'impression {filter === 'pending' ? 'en attente' : filter === 'printed' ? 'imprimee' : filter === 'reprint_requested' ? 'en reimpression' : ''}</p>
         </div>
       ) : (
         <div className="space-y-3">
           {groups.map((group) => {
-            const groupPending = group.orders.filter(o => !o.isPrinted).length;
-            const groupPrinted = group.orders.filter(o => o.isPrinted).length;
+            const groupPending = group.orders.filter(o => o.printStatus === 'pending').length;
+            const groupPrinted = group.orders.filter(o => o.printStatus === 'printed').length;
+            const groupReprint = group.orders.filter(o => o.printStatus === 'reprint_requested').length;
             const totalQty = group.orders.reduce((s, o) => s + o.quantity, 0);
             const isCollapsed = collapsed.has(group.articleName);
 
@@ -296,10 +374,10 @@ export function PrintQueue({ userRole }: Props) {
                 >
                   <div className="flex items-center gap-3">
                     <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-                      groupPending > 0 ? 'bg-cyan-600/20' : 'bg-green-600/20'
+                      groupReprint > 0 ? 'bg-orange-600/20' : groupPending > 0 ? 'bg-cyan-600/20' : 'bg-green-600/20'
                     }`}>
                       <PackageOpen className={`w-4 h-4 ${
-                        groupPending > 0 ? 'text-cyan-400' : 'text-green-400'
+                        groupReprint > 0 ? 'text-orange-400' : groupPending > 0 ? 'text-cyan-400' : 'text-green-400'
                       }`} />
                     </div>
                     <div className="text-left">
@@ -308,10 +386,16 @@ export function PrintQueue({ userRole }: Props) {
                         {group.orders.length} commande(s) · {totalQty} unite(s)
                         {groupPending > 0 && <span className="text-cyan-400"> · {groupPending} en attente</span>}
                         {groupPrinted > 0 && <span className="text-green-400"> · {groupPrinted} imprime(s)</span>}
+                        {groupReprint > 0 && <span className="text-orange-400"> · {groupReprint} reimpression(s)</span>}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
+                    {groupReprint > 0 && (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-orange-600/20 text-orange-400 border border-orange-600/30">
+                        {groupReprint} a valider
+                      </span>
+                    )}
                     {groupPending > 0 && (
                       <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-cyan-600/20 text-cyan-400 border border-cyan-600/30">
                         {groupPending} a imprimer
@@ -325,17 +409,23 @@ export function PrintQueue({ userRole }: Props) {
                 {!isCollapsed && (
                   <div className="divide-y divide-slate-700/50">
                     {group.orders.map((order, idx) => {
-                      const isPrinted = order.isPrinted;
+                      const isPrinted = order.printStatus === 'printed';
+                      const isReprintRequested = order.printStatus === 'reprint_requested';
+                      const isPending = order.printStatus === 'pending';
                       return (
                         <div
                           key={`${order.saleId}-${idx}`}
                           className={`flex items-center gap-4 px-5 py-3 transition-all ${
-                            isPrinted ? 'opacity-60' : 'hover:bg-slate-700/20'
+                            isReprintRequested
+                              ? 'bg-orange-600/5 hover:bg-orange-600/10'
+                              : isPrinted ? 'opacity-60' : 'hover:bg-slate-700/20'
                           }`}
                         >
                           {/* Sequential number */}
                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold ${
-                            isPrinted
+                            isReprintRequested
+                              ? 'bg-orange-600/30 text-orange-300 border border-orange-600/40'
+                              : isPrinted
                               ? 'bg-slate-700 text-slate-400'
                               : 'bg-cyan-600/30 text-cyan-300 border border-cyan-600/40'
                           }`}>
@@ -377,8 +467,15 @@ export function PrintQueue({ userRole }: Props) {
                             </span>
                           </div>
 
-                          {/* Printed timestamp or status badge */}
-                          {isPrinted ? (
+                          {/* Status badge */}
+                          {isReprintRequested ? (
+                            <div className="flex items-center gap-1.5 shrink-0 w-32 justify-end">
+                              <AlertCircle className="w-3.5 h-3.5 text-orange-500" />
+                              <span className="text-xs text-orange-400 font-medium">
+                                A revalider
+                              </span>
+                            </div>
+                          ) : isPrinted ? (
                             <div className="flex items-center gap-1.5 shrink-0 w-32 justify-end">
                               <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
                               <span className="text-xs text-green-400">
@@ -393,10 +490,31 @@ export function PrintQueue({ userRole }: Props) {
 
                           {/* Action button */}
                           <div className="shrink-0">
-                            {canPrint ? (
-                              isPrinted ? (
+                            {isReprintRequested ? (
+                              canValidateReprint ? (
                                 <button
-                                  onClick={() => markAsPending(order.saleId)}
+                                  onClick={() => validateReprint(order.saleId, order.invoiceNumber)}
+                                  disabled={updatingId === order.saleId}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors text-xs shadow-md shadow-orange-600/20"
+                                >
+                                  {updatingId === order.saleId ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <Check className="w-3.5 h-3.5" />
+                                      Valider
+                                    </>
+                                  )}
+                                </button>
+                              ) : (
+                                <span className="text-xs text-orange-400 italic px-2">
+                                  En attente de validation
+                                </span>
+                              )
+                            ) : isPrinted ? (
+                              canPrint ? (
+                                <button
+                                  onClick={() => requestReprint(order.saleId, order.invoiceNumber)}
                                   disabled={updatingId === order.saleId}
                                   className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 rounded-lg font-medium transition-colors text-xs"
                                 >
@@ -410,8 +528,14 @@ export function PrintQueue({ userRole }: Props) {
                                   )}
                                 </button>
                               ) : (
+                                <span className="text-xs text-slate-500 italic px-2">
+                                  Lecture seule
+                                </span>
+                              )
+                            ) : isPending ? (
+                              canPrint ? (
                                 <button
-                                  onClick={() => markAsPrinted(order.saleId)}
+                                  onClick={() => markAsPrinted(order.saleId, order.invoiceNumber)}
                                   disabled={updatingId === order.saleId}
                                   className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors text-xs shadow-md shadow-green-600/20"
                                 >
@@ -424,12 +548,12 @@ export function PrintQueue({ userRole }: Props) {
                                     </>
                                   )}
                                 </button>
+                              ) : (
+                                <span className="text-xs text-slate-500 italic px-2">
+                                  Lecture seule
+                                </span>
                               )
-                            ) : (
-                              <span className="text-xs text-slate-500 italic px-2">
-                                Lecture seule
-                              </span>
-                            )}
+                            ) : null}
                           </div>
                         </div>
                       );

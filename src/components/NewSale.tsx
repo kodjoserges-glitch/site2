@@ -5,6 +5,7 @@ import { Article, Category, Sale, SaleItem, PaymentStatus, DiscountType, Majorat
 import { formatCurrency, calculateSurface } from '../lib/utils';
 import { generateInvoicePDF } from '../lib/pdf';
 import { printReceipt } from '../lib/receipt';
+import { sendNotification } from './NotificationBell';
 
 interface Props {
   profiles: CompanyProfile[];
@@ -232,6 +233,14 @@ export function NewSale({ profiles, defaultProfile, currentUser }: Props) {
 
       setLastSale({ ...saleRecord, sale_items: itemsData ?? [] });
       resetForm();
+      await sendNotification(
+        'new_sale',
+        'imprimeur',
+        'Nouvelle commande',
+        `Nouvelle vente N° ${saleRecord.invoice_number} pour ${clientName.trim()} ajoutee a la file d'attente.`,
+        currentUser.full_name || currentUser.email,
+        saleRecord.id
+      );
     } catch (err) {
       console.error(err);
       alert("Erreur lors de l'enregistrement de la vente");

@@ -26,6 +26,7 @@ import { UserManagement } from './components/UserManagement';
 import { AuthPage } from './components/AuthPage';
 import { Comptabilite } from './components/Comptabilite';
 import { PrintQueue } from './components/PrintQueue';
+import { NotificationBell } from './components/NotificationBell';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { CompanyProfile, UserProfile, UserRole } from './types';
 
@@ -285,6 +286,7 @@ export default function App() {
             </nav>
 
             <div className="flex items-center gap-2">
+              <NotificationBell userRole={userProfile.role} userName={userProfile.full_name || userProfile.email} />
               <div className="relative hidden md:block">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
@@ -373,7 +375,7 @@ export default function App() {
         {activeTab === 'history' && (
           <SalesHistory profiles={profiles} defaultProfile={defaultProfile} currentUser={userProfile} />
         )}
-        {activeTab === 'print' && <PrintQueue userRole={userProfile.role} />}
+        {activeTab === 'print' && <PrintQueue userRole={userProfile.role} userName={userProfile.full_name || userProfile.email} />}
         {activeTab === 'prices' && <PriceManagement />}
         {activeTab === 'company' && <CompanySettings onUpdate={fetchCompanyProfiles} />}
         {activeTab === 'users' && userProfile.role === 'admin' && (

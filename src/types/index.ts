@@ -106,7 +106,7 @@ export interface Sale {
   settled_at: string | null;
   seller_id: string | null;
   seller_name: string | null;
-  print_status: 'pending' | 'printed';
+  print_status: 'pending' | 'printed' | 'reprint_requested';
   printed_at: string | null;
   sale_items?: SaleItem[];
 }
@@ -150,4 +150,18 @@ export interface CompanyProfile {
   is_default: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export type NotificationType = 'new_sale' | 'reprint_request' | 'reprint_validated' | 'print_done';
+
+export interface Notification {
+  id: string;
+  target_role: UserRole | 'all';
+  type: NotificationType;
+  title: string;
+  message: string;
+  sale_id: string | null;
+  actor_name: string;
+  read: boolean;
+  created_at: string;
 }
