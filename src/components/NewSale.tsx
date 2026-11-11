@@ -163,12 +163,10 @@ export function NewSale({ profiles, defaultProfile, currentUser }: Props) {
 
     setSaving(true);
     try {
-      const invoiceNumber = `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-4)}`;
       const firstLine = computedLines[0];
       const isMulti = computedLines.length > 1;
 
       const saleData = {
-        invoice_number: invoiceNumber,
         client_name: clientName.trim(),
         article_id: firstLine.art!.id,
         article_name: isMulti

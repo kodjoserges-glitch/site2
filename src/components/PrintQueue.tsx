@@ -29,6 +29,7 @@ interface GroupedItem {
 
 interface OrderEntry {
   saleId: string;
+  invoiceNumber: string;
   clientName: string;
   time: string;
   quantity: number;
@@ -67,6 +68,7 @@ function buildGroups(sales: Sale[]): GroupedItem[] {
       const list = map.get(e.articleName) ?? [];
       list.push({
         saleId: sale.id,
+        invoiceNumber: sale.invoice_number,
         clientName: sale.client_name,
         time: sale.created_at,
         quantity: e.quantity,
@@ -337,10 +339,13 @@ export function PrintQueue() {
                             </span>
                           </div>
 
-                          {/* Client */}
+                          {/* Client + invoice number */}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-white truncate">
                               {order.clientName}
+                            </p>
+                            <p className="text-xs text-slate-500 truncate">
+                              N° {order.invoiceNumber}
                             </p>
                           </div>
 
