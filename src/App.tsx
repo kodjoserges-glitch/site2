@@ -255,12 +255,11 @@ export default function App() {
                   className="w-10 h-10 rounded-lg object-cover"
                 />
               ) : (
-                <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center"
-                  style={{ background: `linear-gradient(135deg, ${displayColor}, ${displayColor}99)` }}
-                >
-                  <Printer className="w-6 h-6 text-white" />
-                </div>
+                <img
+                  src="/image.png"
+                  alt={displayName}
+                  className="w-10 h-10 rounded-lg object-cover"
+                />
               )}
               <div>
                 <h1 className="text-xl font-bold text-white">{displayName}</h1>
