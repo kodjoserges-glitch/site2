@@ -7,7 +7,6 @@ import {
   Printer,
   Menu,
   X,
-  Building2,
   Users,
   LogOut,
   ChevronDown,
@@ -17,25 +16,28 @@ import {
   Loader2,
   BookOpen,
   AlertTriangle,
+  Briefcase,
+  Calendar,
 } from 'lucide-react';
 import { NewSale } from './components/NewSale';
 import { SalesHistory } from './components/SalesHistory';
 import { PriceManagement } from './components/PriceManagement';
-import { CompanySettings } from './components/CompanySettings';
 import { UserManagement } from './components/UserManagement';
 import { AuthPage } from './components/AuthPage';
 import { Comptabilite } from './components/Comptabilite';
 import { PrintQueue } from './components/PrintQueue';
 import { NotificationBell } from './components/NotificationBell';
+import { VendeurPrestations } from './components/VendeurPrestations';
+import { DailyRecap } from './components/DailyRecap';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { CompanyProfile, UserProfile, UserRole } from './types';
 
-type Tab = 'sale' | 'history' | 'print' | 'prices' | 'company' | 'users' | 'accounting';
+type Tab = 'sale' | 'history' | 'print' | 'prices' | 'users' | 'accounting' | 'prestations' | 'recap';
 
 const ROLE_TABS: Record<UserRole, Tab[]> = {
-  admin: ['sale', 'history', 'print', 'prices', 'company', 'users', 'accounting'],
-  manager: ['sale', 'history', 'print', 'prices', 'company', 'accounting'],
-  vendeur: ['sale', 'history', 'print'],
+  admin: ['sale', 'history', 'print', 'prices', 'users', 'accounting'],
+  manager: ['sale', 'history', 'print', 'prices', 'users', 'accounting'],
+  vendeur: ['sale', 'history', 'print', 'prestations', 'recap'],
   imprimeur: ['print'],
 };
 
@@ -236,9 +238,10 @@ export default function App() {
     { id: 'sale', label: 'Nouvelle Vente', icon: Calculator },
     { id: 'history', label: 'Historique', icon: History },
     { id: 'print', label: 'Impression', icon: Printer },
+    { id: 'prestations', label: 'Prestations', icon: Briefcase },
+    { id: 'recap', label: 'Recap Journee', icon: Calendar },
     { id: 'prices', label: 'Tarifs', icon: Settings },
-    { id: 'company', label: 'Entreprises', icon: Building2 },
-    { id: 'users', label: 'Utilisateurs', icon: Users },
+    { id: 'users', label: 'Gestion', icon: Users },
     { id: 'accounting', label: 'Comptabilite', icon: BookOpen },
   ].filter((item) => allowedTabs.includes(item.id as Tab)) as { id: Tab; label: string; icon: typeof Calculator }[];
 
@@ -377,11 +380,16 @@ export default function App() {
         )}
         {activeTab === 'print' && <PrintQueue userRole={userProfile.role} userName={userProfile.full_name || userProfile.email} />}
         {activeTab === 'prices' && <PriceManagement />}
-        {activeTab === 'company' && <CompanySettings onUpdate={fetchCompanyProfiles} />}
         {activeTab === 'users' && userProfile.role === 'admin' && (
-          <UserManagement currentUserId={userProfile.id} />
+          <UserManagement currentUserId={userProfile.id} onUpdateCompany={fetchCompanyProfiles} />
         )}
         {activeTab === 'accounting' && <Comptabilite />}
+        {activeTab === 'prestations' && userProfile.role === 'vendeur' && (
+          <VendeurPrestations currentUser={userProfile} />
+        )}
+        {activeTab === 'recap' && userProfile.role === 'vendeur' && (
+          <DailyRecap currentUser={userProfile} />
+        )}
       </main>
     </div>
   );
