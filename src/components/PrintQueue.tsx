@@ -19,6 +19,7 @@ import { supabase } from '../lib/supabase';
 import { Sale, UserRole } from '../types';
 import { formatCurrency } from '../lib/utils';
 import { sendNotification } from './NotificationBell';
+import { useRealtime } from '../lib/useRealtime';
 
 function formatTime(date: string): string {
   return new Intl.DateTimeFormat('fr-FR', {
@@ -128,6 +129,8 @@ export function PrintQueue({ userRole, userName }: Props) {
     fetchCounts();
     fetchSales();
   }, [filter, filterDate]);
+
+  useRealtime(['sales', 'sale_items'], () => { fetchCounts(); fetchSales(); });
 
   // ---- Selection ----
   function toggleSelect(saleId: string) {

@@ -3,6 +3,7 @@ import { Plus, Trash2, Loader2, Briefcase, Save, X, Edit2, Download } from 'luci
 import { supabase } from '../lib/supabase';
 import { Service, UserProfile } from '../types';
 import { formatCurrency, formatDateShort } from '../lib/utils';
+import { useRealtime } from '../lib/useRealtime';
 
 interface Props {
   currentUser: UserProfile;
@@ -28,6 +29,8 @@ export function VendeurPrestations(_props: Props) {
   useEffect(() => {
     fetchServices();
   }, []);
+
+  useRealtime(['services'], fetchServices);
 
   async function fetchServices() {
     setLoading(true);

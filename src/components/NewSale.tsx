@@ -6,6 +6,7 @@ import { formatCurrency, calculateSurface } from '../lib/utils';
 import { generateInvoicePDF } from '../lib/pdf';
 import { printReceipt } from '../lib/receipt';
 import { sendNotification } from './NotificationBell';
+import { useRealtime } from '../lib/useRealtime';
 
 interface Props {
   profiles: CompanyProfile[];
@@ -60,6 +61,8 @@ export function NewSale({ profiles, defaultProfile, currentUser }: Props) {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useRealtime(['categories', 'articles'], fetchData);
 
   async function fetchData() {
     try {

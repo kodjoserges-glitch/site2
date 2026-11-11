@@ -15,6 +15,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { Sale, Service, UserProfile } from '../types';
 import { formatCurrency } from '../lib/utils';
+import { useRealtime } from '../lib/useRealtime';
 
 interface Props {
   currentUser: UserProfile;
@@ -29,6 +30,8 @@ export function DailyRecap({ currentUser }: Props) {
   useEffect(() => {
     fetchData();
   }, [selectedDate]);
+
+  useRealtime(['sales', 'services'], fetchData);
 
   async function fetchData() {
     setLoading(true);

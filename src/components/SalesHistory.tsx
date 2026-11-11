@@ -24,6 +24,7 @@ import { Sale, CompanyProfile, UserProfile } from '../types';
 import { formatCurrency, formatDate, exportToCSV } from '../lib/utils';
 import { generateInvoicePDF } from '../lib/pdf';
 import { printReceipt } from '../lib/receipt';
+import { useRealtime } from '../lib/useRealtime';
 
 interface Props {
   profiles: CompanyProfile[];
@@ -66,6 +67,8 @@ export function SalesHistory({ defaultProfile, currentUser }: Props) {
   useEffect(() => {
     fetchSales();
   }, [filterDate]);
+
+  useRealtime(['sales', 'sale_items'], fetchSales);
 
   async function fetchSales() {
     setLoading(true);

@@ -6,6 +6,7 @@ import { formatDateShort, exportToCSV } from '../lib/utils';
 import { ComptaDashboard } from './ComptaDashboard';
 import { ComptaPrestations } from './ComptaPrestations';
 import { ComptaDepenses } from './ComptaDepenses';
+import { useRealtime } from '../lib/useRealtime';
 
 type Period = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'custom';
 type SubTab = 'dashboard' | 'services' | 'expenses';
@@ -83,6 +84,8 @@ export function Comptabilite() {
   );
 
   useEffect(() => { fetchAll(); }, [range.start.getTime(), range.end.getTime()]);
+
+  useRealtime(['sales', 'services', 'expenses'], fetchAll);
 
   async function fetchAll() {
     setLoading(true);

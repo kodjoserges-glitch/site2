@@ -15,6 +15,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { Article, Category, IsoFormat, ISO_FORMATS, PricingType } from '../types';
 import { formatCurrency } from '../lib/utils';
+import { useRealtime } from '../lib/useRealtime';
 
 const PALETTE = [
   '#2563eb', '#0891b2', '#059669', '#d97706',
@@ -47,6 +48,8 @@ export function PriceManagement() {
   useEffect(() => {
     fetchAll();
   }, []);
+
+  useRealtime(['categories', 'articles'], fetchAll);
 
   async function fetchAll() {
     setLoading(true);

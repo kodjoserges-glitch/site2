@@ -19,6 +19,7 @@ import { supabase } from '../lib/supabase';
 import { UserProfile, UserRole, ROLE_LABELS } from '../types';
 import { CompanySettings } from './CompanySettings';
 import { PriceManagement } from './PriceManagement';
+import { useRealtime } from '../lib/useRealtime';
 
 interface Props {
   currentUserId: string;
@@ -62,6 +63,8 @@ export function UserManagement({ currentUserId, onUpdateCompany }: Props) {
   useEffect(() => {
     fetchProfiles();
   }, []);
+
+  useRealtime(['user_profiles'], fetchProfiles);
 
   async function fetchProfiles() {
     setLoading(true);

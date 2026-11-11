@@ -28,6 +28,7 @@ import { NotificationBell } from './components/NotificationBell';
 import { VendeurPrestations } from './components/VendeurPrestations';
 import { DailyRecap } from './components/DailyRecap';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
+import { useRealtime } from './lib/useRealtime';
 import { CompanyProfile, UserProfile, UserRole } from './types';
 
 type Tab = 'sale' | 'history' | 'print' | 'users' | 'accounting' | 'prestations' | 'recap';
@@ -101,6 +102,8 @@ export default function App() {
     if (!session) return;
     fetchCompanyProfiles();
   }, [session]);
+
+  useRealtime(['company_settings'], fetchCompanyProfiles, !!session);
 
   async function fetchCompanyProfiles() {
     try {
