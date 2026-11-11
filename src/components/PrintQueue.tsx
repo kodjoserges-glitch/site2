@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Trash2,
   XCircle,
+  Calendar,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Sale, UserRole } from '../types';
@@ -117,6 +118,7 @@ export function PrintQueue({ userRole, userName }: Props) {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'pending' | 'printed' | 'reprint_requested' | 'all'>('pending');
+  const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -125,7 +127,7 @@ export function PrintQueue({ userRole, userName }: Props) {
     setSelectedIds(new Set());
     fetchCounts();
     fetchSales();
-  }, [filter]);
+  }, [filter, filterDate]);
 
   // ---- Selection ----
   function toggleSelect(saleId: string) {
@@ -182,6 +184,11 @@ export function PrintQueue({ userRole, userName }: Props) {
   async function fetchSales() {
     setLoading(true);
     try {
+      const startOfDay = new Date(filterDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(filterDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
       let query = supabase
         .from('sales')
         .select('*, sale_items(*)')
@@ -190,9 +197,19 @@ export function PrintQueue({ userRole, userName }: Props) {
       if (filter === 'pending') {
         query = query.eq('print_status', 'pending');
       } else if (filter === 'printed') {
-        query = query.eq('print_status', 'printed');
+        query = query
+          .eq('print_status', 'printed')
+          .gte('created_at', startOfDay.toISOString())
+          .lte('created_at', endOfDay.toISOString());
       } else if (filter === 'reprint_requested') {
-        query = query.eq('print_status', 'reprint_requested');
+        query = query
+          .eq('print_status', 'reprint_requested')
+          .gte('created_at', startOfDay.toISOString())
+          .lte('created_at', endOfDay.toISOString());
+      } else {
+        query = query
+          .gte('created_at', startOfDay.toISOString())
+          .lte('created_at', endOfDay.toISOString());
       }
 
       const { data, error } = await query;
@@ -384,11 +401,26 @@ export function PrintQueue({ userRole, userName }: Props) {
               <div>
                 <h2 className="text-lg font-bold text-white">File d'Impression</h2>
                 <p className="text-sm text-slate-400">
-                  {pendingCount} en attente · {printedCount} imprime(s) · {reprintCount} reimpression(s) · {groups.length} article(s)
+                  {pendingCount} en attente · {printedCount} imprime(s) · {reprintCount} reimpression(s) · {groups.length} article(s){filter !== 'pending' && ` · ${filterDate}`}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="date"
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                  className={`pl-10 pr-4 py-2 bg-slate-700 border rounded-lg text-white focus:ring-2 focus:border-transparent transition-all ${
+                    filter === 'pending'
+                      ? 'border-slate-600 opacity-50 cursor-not-allowed'
+                      : 'border-slate-600 focus:ring-blue-500'
+                  }`}
+                  disabled={filter === 'pending'}
+                  title={filter === 'pending' ? 'Les commandes en attente s\'affichent tous les jours' : 'Filtrer par date'}
+                />
+              </div>
               <div className="flex bg-slate-700 rounded-lg p-0.5 gap-0.5 flex-wrap">
                 <button
                   onClick={() => setFilter('pending')}
@@ -497,7 +529,7 @@ export function PrintQueue({ userRole, userName }: Props) {
       ) : sales.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 bg-slate-800 rounded-2xl border border-slate-700 text-slate-400">
           <Printer className="w-12 h-12 mb-4 opacity-50" />
-          <p>Aucune commande d'impression {filter === 'pending' ? 'en attente' : filter === 'printed' ? 'imprimee' : filter === 'reprint_requested' ? 'en reimpression' : ''}</p>
+          <p>Aucune commande d'impression {filter === 'pending' ? 'en attente' : filter === 'printed' ? 'imprimee' : filter === 'reprint_requested' ? 'en reimpression' : `pour le ${filterDate}`}</p>
         </div>
       ) : (
         <div className="space-y-3">
