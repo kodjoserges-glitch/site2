@@ -229,7 +229,10 @@ export function NewSale({ profiles, defaultProfile, currentUser }: Props) {
         .from('sale_items')
         .insert(itemsPayload)
         .select();
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        await supabase.from('sales').delete().eq('id', saleRecord.id);
+        throw itemsError;
+      }
 
       setLastSale({ ...saleRecord, sale_items: itemsData ?? [] });
       resetForm();

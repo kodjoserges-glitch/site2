@@ -1,5 +1,14 @@
 import { Sale, CompanyProfile } from '../types';
 
+function esc(value: string): string {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function fmt(amount: number): string {
   return new Intl.NumberFormat('fr-FR', {
     minimumFractionDigits: 0,
@@ -77,7 +86,7 @@ export function printReceipt(sale: Sale, company?: Partial<CompanyProfile>): voi
 
       if (i > 0) itemsHtml += sep();
       itemsHtml += `
-        <tr><td colspan="2" style="padding-top:3px;font-weight:700;">${item.article_name}</td></tr>
+        <tr><td colspan="2" style="padding-top:3px;font-weight:700;">${esc(item.article_name)}</td></tr>
         <tr>
           <td style="color:#555;font-size:9pt;">${dims} — ${qtyInfo}</td>
           <td style="text-align:right;color:#555;font-size:9pt;">${unitInfo}</td>
@@ -94,7 +103,7 @@ export function printReceipt(sale: Sale, company?: Partial<CompanyProfile>): voi
     const unitInfo = isFormat ? `${fmt(sale.price_per_sqm)}/u` : `${fmt(sale.price_per_sqm)}/m²`;
     const qtyInfo = isFormat ? `x ${sale.quantity}` : `${sale.surface} m² x ${sale.quantity}`;
     itemsHtml = `
-      <tr><td colspan="2" style="font-weight:700;">${sale.article_name}</td></tr>
+      <tr><td colspan="2" style="font-weight:700;">${esc(sale.article_name)}</td></tr>
       <tr>
         <td style="color:#555;font-size:9pt;">${dims} — ${qtyInfo}</td>
         <td style="text-align:right;color:#555;font-size:9pt;">${unitInfo}</td>
@@ -195,17 +204,17 @@ export function printReceipt(sale: Sale, company?: Partial<CompanyProfile>): voi
 </head>
 <body>
 
-  <h1>${c.company_name}</h1>
-  ${c.slogan ? `<p class="slogan">${c.slogan}</p>` : ''}
-  ${c.phone ? `<p class="contact">Tel: ${c.phone}</p>` : ''}
-  ${c.address ? `<p class="contact">${c.address}</p>` : ''}
+  <h1>${esc(c.company_name)}</h1>
+  ${c.slogan ? `<p class="slogan">${esc(c.slogan)}</p>` : ''}
+  ${c.phone ? `<p class="contact">Tel: ${esc(c.phone)}</p>` : ''}
+  ${c.address ? `<p class="contact">${esc(c.address)}</p>` : ''}
 
   <hr class="divider-solid">
 
   <table class="invoice-meta">
     <tr>
       <td>Facture N°</td>
-      <td>${sale.invoice_number}</td>
+      <td>${esc(sale.invoice_number)}</td>
     </tr>
     <tr>
       <td>Date</td>
@@ -213,7 +222,7 @@ export function printReceipt(sale: Sale, company?: Partial<CompanyProfile>): voi
     </tr>
     <tr>
       <td>Client</td>
-      <td>${sale.client_name}</td>
+      <td>${esc(sale.client_name)}</td>
     </tr>
   </table>
 
@@ -248,11 +257,11 @@ export function printReceipt(sale: Sale, company?: Partial<CompanyProfile>): voi
 
   <span class="status-badge">${statusLabel}</span>
 
-  ${sale.notes ? `<hr class="divider-dash"><p style="font-size:8pt;font-style:italic;color:#555;margin:2px 0;">${sale.notes}</p>` : ''}
+  ${sale.notes ? `<hr class="divider-dash"><p style="font-size:8pt;font-style:italic;color:#555;margin:2px 0;">${esc(sale.notes)}</p>` : ''}
 
   <hr class="divider-solid">
-  <p class="footer">${c.invoice_footer}</p>
-  ${c.email ? `<p class="footer">${c.email}</p>` : ''}
+  <p class="footer">${esc(c.invoice_footer)}</p>
+  ${c.email ? `<p class="footer">${esc(c.email)}</p>` : ''}
 
 </body>
 </html>`;

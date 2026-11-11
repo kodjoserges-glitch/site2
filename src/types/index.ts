@@ -4,18 +4,17 @@ export type IsoFormat = 'A0' | 'A1' | 'A2' | 'A3' | 'A4' | 'A5' | 'A6' | 'A7';
 export interface FormatDimensions {
   width: number;  // metres
   height: number; // metres
-  surfaceCm2: number;
 }
 
 export const ISO_FORMATS: Record<IsoFormat, FormatDimensions> = {
-  A0: { width: 0.841, height: 1.189, surfaceCm2: 8410 * 11890 / 10000 },
-  A1: { width: 0.594, height: 0.841, surfaceCm2: 5940 * 8410 / 10000 },
-  A2: { width: 0.420, height: 0.594, surfaceCm2: 4200 * 5940 / 10000 },
-  A3: { width: 0.297, height: 0.420, surfaceCm2: 2970 * 4200 / 10000 },
-  A4: { width: 0.210, height: 0.297, surfaceCm2: 2100 * 2970 / 10000 },
-  A5: { width: 0.148, height: 0.210, surfaceCm2: 1480 * 2100 / 10000 },
-  A6: { width: 0.105, height: 0.148, surfaceCm2: 1050 * 1480 / 10000 },
-  A7: { width: 0.074, height: 0.105, surfaceCm2: 740 * 1050 / 10000 },
+  A0: { width: 0.841, height: 1.189 },
+  A1: { width: 0.594, height: 0.841 },
+  A2: { width: 0.420, height: 0.594 },
+  A3: { width: 0.297, height: 0.420 },
+  A4: { width: 0.210, height: 0.297 },
+  A5: { width: 0.148, height: 0.210 },
+  A6: { width: 0.105, height: 0.148 },
+  A7: { width: 0.074, height: 0.105 },
 };
 
 export type ExpenseCategory = 'achat' | 'divers';

@@ -112,14 +112,33 @@ export function PrintQueue({ userRole, userName }: Props) {
   const canValidateReprint = VALIDATE_ROLES.includes(userRole);
   const canDelete = userRole === 'admin' || userRole === 'manager';
   const [sales, setSales] = useState<Sale[]>([]);
+  const [counts, setCounts] = useState({ pending: 0, printed: 0, reprint_requested: 0 });
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'pending' | 'printed' | 'reprint_requested' | 'all'>('pending');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    fetchCounts();
     fetchSales();
   }, [filter]);
+
+  async function fetchCounts() {
+    try {
+      const [p, pr, rp] = await Promise.all([
+        supabase.from('sales').select('*', { count: 'exact', head: true }).eq('print_status', 'pending'),
+        supabase.from('sales').select('*', { count: 'exact', head: true }).eq('print_status', 'printed'),
+        supabase.from('sales').select('*', { count: 'exact', head: true }).eq('print_status', 'reprint_requested'),
+      ]);
+      setCounts({
+        pending: p.count ?? 0,
+        printed: pr.count ?? 0,
+        reprint_requested: rp.count ?? 0,
+      });
+    } catch {
+      // counts are non-critical
+    }
+  }
 
   async function fetchSales() {
     setLoading(true);
@@ -284,9 +303,9 @@ export function PrintQueue({ userRole, userName }: Props) {
   }
 
   const groups = buildGroups(sales);
-  const pendingCount = sales.filter(s => s.print_status === 'pending').length;
-  const printedCount = sales.filter(s => s.print_status === 'printed').length;
-  const reprintCount = sales.filter(s => s.print_status === 'reprint_requested').length;
+  const pendingCount = counts.pending;
+  const printedCount = counts.printed;
+  const reprintCount = counts.reprint_requested;
 
   return (
     <div className="space-y-6">

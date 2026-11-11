@@ -14,6 +14,7 @@ const CLIENT_ID = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID as string | und
 type Status = 'idle' | 'connecting' | 'syncing' | 'synced' | 'error';
 
 export function DriveSync() {
+  const [authorized, setAuthorized] = useState(false);
   const [connected, setConnected] = useState(() => !!getToken());
   const [status, setStatus] = useState<Status>('idle');
   const [lastSync, setLastSync] = useState<Date | null>(null);
@@ -26,6 +27,22 @@ export function DriveSync() {
   useEffect(() => {
     if (!CLIENT_ID) return;
     initGoogleAuth(CLIENT_ID).catch(console.error);
+  }, []);
+
+  // Verify user is admin or manager before allowing sync
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('user_profiles')
+        .select('role, status')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (data?.status === 'approved' && (data.role === 'admin' || data.role === 'manager')) {
+        setAuthorized(true);
+      }
+    })();
   }, []);
 
   // Listen to realtime DB changes → trigger auto-sync
@@ -116,6 +133,22 @@ export function DriveSync() {
   }
 
   const sheetUrl = sheetId ? `https://docs.google.com/spreadsheets/d/${sheetId}` : null;
+
+  if (!authorized) {
+    return (
+      <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl bg-slate-700 flex items-center justify-center shrink-0">
+            <CloudOff className="w-5 h-5 text-slate-400" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-white">Synchronisation Google Drive</h3>
+            <p className="text-xs text-slate-400">Accès réservé aux administrateurs et managers</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6">

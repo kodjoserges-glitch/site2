@@ -57,6 +57,7 @@ export default function App() {
   // All hooks must come before any conditional return
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [profileError, setProfileError] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('sale');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -78,11 +79,15 @@ export default function App() {
   useEffect(() => {
     if (!session?.user) return;
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('id', session.user.id)
         .maybeSingle();
+      if (error) {
+        setProfileError(true);
+        return;
+      }
       const profile = data as UserProfile | null;
       setUserProfile(profile);
       if (profile) {
@@ -154,6 +159,30 @@ export default function App() {
   }
 
   if (!userProfile) {
+    if (profileError) {
+      return (
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+          <div className="w-full max-w-md text-center space-y-6">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-red-600/20 rounded-full mb-2">
+              <AlertTriangle className="w-10 h-10 text-red-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white mb-2">Profil introuvable</h1>
+              <p className="text-slate-400 text-sm leading-relaxed">
+                Votre profil utilisateur n'a pas pu etre charge. Veuillez vous reconnecter ou contactez un administrateur.
+              </p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center justify-center gap-2 w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl transition-colors font-medium"
+            >
+              <LogOut className="w-4 h-4" />
+              Se deconnecter
+            </button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
@@ -375,7 +404,7 @@ export default function App() {
           <SalesHistory profiles={profiles} defaultProfile={defaultProfile} currentUser={userProfile} />
         )}
         {activeTab === 'print' && <PrintQueue userRole={userProfile.role} userName={userProfile.full_name || userProfile.email} />}
-        {activeTab === 'users' && userProfile.role === 'admin' && (
+        {activeTab === 'users' && (userProfile.role === 'admin' || userProfile.role === 'manager') && (
           <UserManagement currentUserId={userProfile.id} onUpdateCompany={fetchCompanyProfiles} />
         )}
         {activeTab === 'accounting' && <Comptabilite />}

@@ -2,11 +2,9 @@ import { Sale } from '../types';
 
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'XOF',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(amount).replace('XOF', 'FCFA');
+  }).format(amount) + ' FCFA';
 }
 
 export function formatDate(date: string): string {
@@ -87,9 +85,18 @@ export function exportToCSV(sales: Sale[]): void {
     sale.payment_status === 'paid' ? 'Payé' : sale.payment_status === 'advance' ? 'Avance' : 'Non payé',
   ]);
 
+  function csvCell(value: unknown): string {
+    const str = String(value ?? '');
+    const escaped = str.replace(/"/g, '""');
+    if (/^[=+\-@\t\r]/.test(str)) {
+      return `"'${escaped}"`;
+    }
+    return `"${escaped}"`;
+  }
+
   const csvContent = [
     headers.join(';'),
-    ...rows.map(row => row.map(cell => `"${cell}"`).join(';')),
+    ...rows.map(row => row.map(cell => csvCell(cell)).join(';')),
   ].join('\n');
 
   const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });

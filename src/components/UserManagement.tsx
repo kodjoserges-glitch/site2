@@ -242,8 +242,8 @@ export function UserManagement({ currentUserId, onUpdateCompany }: Props) {
                     {/* Role to assign */}
                     <div className="flex items-center gap-2 flex-wrap">
                       <select
-                        defaultValue="vendeur"
-                        id={`role-${profile.id}`}
+                        value={pendingRoles[profile.id] ?? 'vendeur'}
+                        onChange={e => setPendingRole(profile.id, e.target.value as UserRole)}
                         className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       >
                         {(Object.entries(ROLE_LABELS) as [UserRole, string][]).map(([r, label]) => (
@@ -251,10 +251,7 @@ export function UserManagement({ currentUserId, onUpdateCompany }: Props) {
                         ))}
                       </select>
                       <button
-                        onClick={() => {
-                          const sel = document.getElementById(`role-${profile.id}`) as HTMLSelectElement;
-                          approveUser(profile.id, (sel?.value as UserRole) ?? 'vendeur');
-                        }}
+                        onClick={() => approveUser(profile.id, pendingRoles[profile.id] ?? 'vendeur')}
                         disabled={saving === profile.id}
                         className="flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
                       >
@@ -398,7 +395,7 @@ export function UserManagement({ currentUserId, onUpdateCompany }: Props) {
                       <span className="text-sm text-slate-500 truncate block">{profile.email}</span>
                     </div>
                     <button
-                      onClick={() => approveUser(profile.id)}
+                      onClick={() => approveUser(profile.id, profile.role)}
                       disabled={saving === profile.id}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 rounded-lg text-xs font-medium transition-colors"
                     >

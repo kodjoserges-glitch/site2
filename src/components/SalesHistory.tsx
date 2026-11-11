@@ -42,7 +42,7 @@ interface SettleRequest {
   sale: Sale;
 }
 
-export function SalesHistory({ profiles, defaultProfile, currentUser }: Props) {
+export function SalesHistory({ defaultProfile, currentUser }: Props) {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
@@ -174,26 +174,44 @@ export function SalesHistory({ profiles, defaultProfile, currentUser }: Props) {
 
     try {
       const { sale } = settleRequest;
-      const newAmountPaid = sale.amount_paid + addedAmount;
+      const remaining = Math.max(0, sale.total - sale.amount_paid);
+      const effectiveAmount = Math.min(addedAmount, remaining);
+      const newAmountPaid = sale.amount_paid + effectiveAmount;
       const newStatus: 'paid' | 'advance' | 'unpaid' =
         newAmountPaid >= sale.total ? 'paid' : newAmountPaid > 0 ? 'advance' : 'unpaid';
-      const settled = newStatus === 'paid' ? new Date(settleDate).toISOString() : null;
+      let settled: string | null = null;
+      if (newStatus === 'paid') {
+        if (settleDate) {
+          const parsed = new Date(settleDate);
+          if (isNaN(parsed.getTime())) {
+            setSettleError('Date de reglement invalide.');
+            setSettleLoading(false);
+            return;
+          }
+          settled = parsed.toISOString();
+        } else {
+          settled = new Date().toISOString();
+        }
+      }
 
-      const { error } = await supabase
-        .from('sales')
-        .update({
-          amount_paid: newAmountPaid,
-          payment_status: newStatus,
-          settled_at: settled,
-        })
-        .eq('id', sale.id);
+      const { data: updated, error: rpcError } = await supabase
+        .rpc('settle_sale', {
+          p_sale_id: sale.id,
+          p_added_amount: effectiveAmount,
+          p_settled_at: settled,
+        });
 
-      if (error) throw error;
+      if (rpcError) throw rpcError;
+
+      const result = updated?.[0] ?? null;
+      const finalAmountPaid = result?.amount_paid ?? newAmountPaid;
+      const finalStatus = (result?.payment_status ?? newStatus) as 'paid' | 'advance' | 'unpaid';
+      const finalSettled = (result?.settled_at ?? settled) as string | null;
 
       setSales(prev =>
         prev.map(s =>
           s.id === sale.id
-            ? { ...s, amount_paid: newAmountPaid, payment_status: newStatus, settled_at: settled }
+            ? { ...s, amount_paid: finalAmountPaid, payment_status: finalStatus, settled_at: finalSettled }
             : s
         )
       );
@@ -207,13 +225,11 @@ export function SalesHistory({ profiles, defaultProfile, currentUser }: Props) {
   }
 
   function handlePrintInvoice(sale: Sale) {
-    const company = profiles.find(p => p.id === defaultProfile?.id) ?? defaultProfile ?? undefined;
-    printReceipt(sale, company ?? undefined);
+    printReceipt(sale, defaultProfile ?? undefined);
   }
 
   function handleDownloadPDF(sale: Sale) {
-    const company = profiles.find(p => p.id === defaultProfile?.id) ?? defaultProfile ?? undefined;
-    generateInvoicePDF(sale, company ?? undefined);
+    generateInvoicePDF(sale, defaultProfile ?? undefined);
   }
 
   function handleExportCSV() {
