@@ -82,7 +82,7 @@ function buildGroups(sales: Sale[]): GroupedItem[] {
 
   const groups: GroupedItem[] = [];
   for (const [articleName, orders] of map.entries()) {
-    orders.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+    orders.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
     groups.push({ articleName, orders });
   }
   groups.sort((a, b) => {
