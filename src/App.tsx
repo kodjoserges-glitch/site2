@@ -373,7 +373,7 @@ export default function App() {
         {activeTab === 'history' && (
           <SalesHistory profiles={profiles} defaultProfile={defaultProfile} currentUser={userProfile} />
         )}
-        {activeTab === 'print' && <PrintQueue />}
+        {activeTab === 'print' && <PrintQueue userRole={userProfile.role} />}
         {activeTab === 'prices' && <PriceManagement />}
         {activeTab === 'company' && <CompanySettings onUpdate={fetchCompanyProfiles} />}
         {activeTab === 'users' && userProfile.role === 'admin' && (

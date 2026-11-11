@@ -12,7 +12,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Sale, SaleItem } from '../types';
+import { Sale, SaleItem, UserRole } from '../types';
 import { formatCurrency } from '../lib/utils';
 
 function formatTime(date: string): string {
@@ -96,7 +96,14 @@ function buildGroups(sales: Sale[]): GroupedItem[] {
   return groups;
 }
 
-export function PrintQueue() {
+interface Props {
+  userRole: UserRole;
+}
+
+const PRINT_ROLES: UserRole[] = ['admin', 'manager', 'imprimeur'];
+
+export function PrintQueue({ userRole }: Props) {
+  const canPrint = PRINT_ROLES.includes(userRole);
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -386,36 +393,42 @@ export function PrintQueue() {
 
                           {/* Action button */}
                           <div className="shrink-0">
-                            {isPrinted ? (
-                              <button
-                                onClick={() => markAsPending(order.saleId)}
-                                disabled={updatingId === order.saleId}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 rounded-lg font-medium transition-colors text-xs"
-                              >
-                                {updatingId === order.saleId ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <>
-                                    <RotateCcw className="w-3.5 h-3.5" />
-                                    Reimprimer
-                                  </>
-                                )}
-                              </button>
+                            {canPrint ? (
+                              isPrinted ? (
+                                <button
+                                  onClick={() => markAsPending(order.saleId)}
+                                  disabled={updatingId === order.saleId}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 rounded-lg font-medium transition-colors text-xs"
+                                >
+                                  {updatingId === order.saleId ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <RotateCcw className="w-3.5 h-3.5" />
+                                      Reimprimer
+                                    </>
+                                  )}
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => markAsPrinted(order.saleId)}
+                                  disabled={updatingId === order.saleId}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors text-xs shadow-md shadow-green-600/20"
+                                >
+                                  {updatingId === order.saleId ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <Check className="w-3.5 h-3.5" />
+                                      Valider
+                                    </>
+                                  )}
+                                </button>
+                              )
                             ) : (
-                              <button
-                                onClick={() => markAsPrinted(order.saleId)}
-                                disabled={updatingId === order.saleId}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors text-xs shadow-md shadow-green-600/20"
-                              >
-                                {updatingId === order.saleId ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <>
-                                    <Check className="w-3.5 h-3.5" />
-                                    Valider
-                                  </>
-                                )}
-                              </button>
+                              <span className="text-xs text-slate-500 italic px-2">
+                                Lecture seule
+                              </span>
                             )}
                           </div>
                         </div>
