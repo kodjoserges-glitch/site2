@@ -175,7 +175,7 @@ export function ComptaDashboard({ sales, services, expenses, range, loading }: P
                 </div>
                 <span className="text-xs text-slate-400 leading-tight">{kpi.label}</span>
               </div>
-              <p className={`text-xl font-bold ${kpi.highlight ? textMap[kpi.color] : 'text-white'}`}>
+              <p className={`text-xl font-bold ${'highlight' in kpi && kpi.highlight ? textMap[kpi.color] : 'text-white'}`}>
                 {formatCurrency(kpi.value)}
               </p>
               <p className="text-xs text-slate-500 mt-1">{kpi.sub}</p>

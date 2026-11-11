@@ -136,7 +136,7 @@ export function PriceManagement() {
         pricing_type: artForm.pricing_type,
         price_per_sqm: isFormat ? 0 : Math.round(parseFloat(artForm.price_per_sqm)),
         price_per_unit: isFormat ? Math.round(parseFloat(artForm.price_per_unit)) : null,
-        format: isFormat ? artForm.format : null,
+        format: isFormat ? artForm.format || null : null,
       };
       if (editingArtId) {
         const { error } = await supabase.from('articles').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', editingArtId);

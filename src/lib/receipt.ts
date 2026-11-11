@@ -1,4 +1,4 @@
-import { Sale, CompanyProfile, ISO_FORMATS } from '../types';
+import { Sale, CompanyProfile } from '../types';
 
 function fmt(amount: number): string {
   return new Intl.NumberFormat('fr-FR', {

@@ -11,9 +11,10 @@ import {
   ChevronDown,
   Layers,
   AlertCircle,
+  Trash2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Sale, SaleItem, UserRole } from '../types';
+import { Sale, UserRole } from '../types';
 import { formatCurrency } from '../lib/utils';
 import { sendNotification } from './NotificationBell';
 
@@ -109,6 +110,7 @@ const VALIDATE_ROLES: UserRole[] = ['admin', 'manager', 'vendeur'];
 export function PrintQueue({ userRole, userName }: Props) {
   const canPrint = PRINT_ROLES.includes(userRole);
   const canValidateReprint = VALIDATE_ROLES.includes(userRole);
+  const canDelete = userRole === 'admin' || userRole === 'manager';
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -212,6 +214,25 @@ export function PrintQueue({ userRole, userName }: Props) {
     } catch (err) {
       console.error('Error requesting reprint:', err);
       alert('Erreur lors de la demande de reimpression.');
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  async function deleteSale(saleId: string, invoiceNumber: string) {
+    if (!window.confirm(`Supprimer définitivement la commande N° ${invoiceNumber} ?`)) return;
+
+    setUpdatingId(saleId);
+    try {
+      const { error } = await supabase
+        .from('sales')
+        .delete()
+        .eq('id', saleId);
+      if (error) throw error;
+      setSales(prev => prev.filter(s => s.id !== saleId));
+    } catch (err) {
+      console.error('Error deleting sale:', err);
+      alert('Suppression impossible. Vérifiez vos droits ou réessayez.');
     } finally {
       setUpdatingId(null);
     }
@@ -489,7 +510,7 @@ export function PrintQueue({ userRole, userName }: Props) {
                           )}
 
                           {/* Action button */}
-                          <div className="shrink-0">
+                          <div className="flex items-center gap-2 shrink-0">
                             {isReprintRequested ? (
                               canValidateReprint ? (
                                 <button
@@ -554,6 +575,21 @@ export function PrintQueue({ userRole, userName }: Props) {
                                 </span>
                               )
                             ) : null}
+                            {canDelete && (
+                              <button
+                                onClick={() => deleteSale(order.saleId, order.invoiceNumber)}
+                                disabled={updatingId === order.saleId}
+                                title="Supprimer la commande"
+                                aria-label={`Supprimer la commande N° ${order.invoiceNumber}`}
+                                className="p-1.5 text-red-400 hover:text-white hover:bg-red-600 disabled:opacity-50 rounded-lg transition-colors"
+                              >
+                                {updatingId === order.saleId ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            )}
                           </div>
                         </div>
                       );

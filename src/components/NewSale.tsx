@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Calculator, ShoppingCart, Loader2, Check, Building2, Tag, Ruler, Plus, Trash2, PackageOpen, Printer, FileDown, TrendingUp } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Article, Category, Sale, SaleItem, PaymentStatus, DiscountType, MajorationType, CompanyProfile, UserProfile, ISO_FORMATS } from '../types';
+import { Article, Category, Sale, PaymentStatus, DiscountType, MajorationType, CompanyProfile, UserProfile, ISO_FORMATS } from '../types';
 import { formatCurrency, calculateSurface } from '../lib/utils';
 import { generateInvoicePDF } from '../lib/pdf';
 import { printReceipt } from '../lib/receipt';

@@ -14,7 +14,7 @@ interface Props {
 
 const emptyForm = { name: '', description: '', amount: '', service_date: new Date().toISOString().split('T')[0], client_name: '', notes: '' };
 
-export function ComptaPrestations({ services, range, onUpdate }: Props) {
+export function ComptaPrestations({ services, onUpdate }: Props) {
   const [modal, setModal] = useState<'create' | 'edit' | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);

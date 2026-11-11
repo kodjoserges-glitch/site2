@@ -17,7 +17,7 @@ const emptyForm = {
   notes: '',
 };
 
-export function VendeurPrestations({ currentUser }: Props) {
+export function VendeurPrestations(_props: Props) {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

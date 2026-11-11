@@ -14,7 +14,7 @@ interface Props {
 
 const emptyForm = { category: 'divers' as ExpenseCategory, name: '', amount: '', expense_date: new Date().toISOString().split('T')[0], supplier: '', notes: '' };
 
-export function ComptaDepenses({ expenses, range, onUpdate }: Props) {
+export function ComptaDepenses({ expenses, onUpdate }: Props) {
   const [modal, setModal] = useState<'create' | 'edit' | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);

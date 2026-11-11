@@ -83,9 +83,10 @@ export default function App() {
         .select('*')
         .eq('id', session.user.id)
         .maybeSingle();
-      setUserProfile(data);
-      if (data) {
-        const allowed = ROLE_TABS[data.role];
+      const profile = data as UserProfile | null;
+      setUserProfile(profile);
+      if (profile) {
+        const allowed = ROLE_TABS[profile.role];
         setActiveTab((prev) => (allowed.includes(prev) ? prev : allowed[0]));
       }
     })();
@@ -229,7 +230,6 @@ export default function App() {
   const allowedTabs = ROLE_TABS[userProfile.role];
   const displayName = defaultProfile?.company_name || 'Imprimerie Pro';
   const displaySlogan = defaultProfile?.slogan || 'Systeme de gestion';
-  const displayColor = defaultProfile?.primary_color || '#1b7297';
   const RoleIcon = ROLE_ICON[userProfile.role];
 
   const navItems: { id: Tab; label: string; icon: typeof Calculator }[] = [

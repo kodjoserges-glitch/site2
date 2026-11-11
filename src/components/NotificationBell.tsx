@@ -34,7 +34,7 @@ function timeAgo(date: string): string {
   return `Il y a ${days} j`;
 }
 
-export function NotificationBell({ userRole, userName }: Props) {
+export function NotificationBell(_props: Props) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const [bellAnim, setBellAnim] = useState(false);
