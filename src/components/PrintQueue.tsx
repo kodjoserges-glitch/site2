@@ -326,10 +326,14 @@ export function PrintQueue() {
                             isPrinted ? 'opacity-60' : 'hover:bg-slate-700/20'
                           }`}
                         >
-                          {/* Status indicator */}
-                          <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                            isPrinted ? 'bg-green-500' : 'bg-cyan-500 animate-pulse'
-                          }`} />
+                          {/* Sequential number */}
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold ${
+                            isPrinted
+                              ? 'bg-slate-700 text-slate-400'
+                              : 'bg-cyan-600/30 text-cyan-300 border border-cyan-600/40'
+                          }`}>
+                            {idx + 1}
+                          </div>
 
                           {/* Time */}
                           <div className="flex items-center gap-1.5 w-16 shrink-0">
