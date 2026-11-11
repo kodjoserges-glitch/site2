@@ -8,9 +8,11 @@ import {
   PackageOpen,
   Check,
   RotateCcw,
+  ChevronDown,
+  Layers,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Sale } from '../types';
+import { Sale, SaleItem } from '../types';
 import { formatCurrency } from '../lib/utils';
 
 function formatTime(date: string): string {
@@ -20,11 +22,84 @@ function formatTime(date: string): string {
   }).format(new Date(date));
 }
 
+interface GroupedItem {
+  articleName: string;
+  orders: OrderEntry[];
+}
+
+interface OrderEntry {
+  saleId: string;
+  clientName: string;
+  time: string;
+  quantity: number;
+  surface: number;
+  pricingType: string;
+  saleTotal: number;
+  isPrinted: boolean;
+  printedAt: string | null;
+}
+
+function buildGroups(sales: Sale[]): GroupedItem[] {
+  const map = new Map<string, OrderEntry[]>();
+  for (const sale of sales) {
+    const items = sale.sale_items ?? [];
+    const entries: { articleName: string; quantity: number; surface: number; pricingType: string }[] = [];
+
+    if (items.length > 0) {
+      for (const item of items) {
+        entries.push({
+          articleName: item.article_name,
+          quantity: item.quantity,
+          surface: Number(item.surface),
+          pricingType: item.pricing_type,
+        });
+      }
+    } else {
+      entries.push({
+        articleName: sale.article_name,
+        quantity: sale.quantity,
+        surface: Number(sale.surface),
+        pricingType: sale.pricing_type,
+      });
+    }
+
+    for (const e of entries) {
+      const list = map.get(e.articleName) ?? [];
+      list.push({
+        saleId: sale.id,
+        clientName: sale.client_name,
+        time: sale.created_at,
+        quantity: e.quantity,
+        surface: e.surface,
+        pricingType: e.pricingType,
+        saleTotal: sale.total,
+        isPrinted: sale.print_status === 'printed',
+        printedAt: sale.printed_at,
+      });
+      map.set(e.articleName, list);
+    }
+  }
+
+  const groups: GroupedItem[] = [];
+  for (const [articleName, orders] of map.entries()) {
+    orders.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+    groups.push({ articleName, orders });
+  }
+  groups.sort((a, b) => {
+    const aPending = a.orders.filter(o => !o.isPrinted).length;
+    const bPending = b.orders.filter(o => !o.isPrinted).length;
+    if (aPending !== bPending) return bPending - aPending;
+    return a.articleName.localeCompare(b.articleName);
+  });
+  return groups;
+}
+
 export function PrintQueue() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'pending' | 'printed' | 'all'>('pending');
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchSales();
@@ -106,6 +181,16 @@ export function PrintQueue() {
     }
   }
 
+  function toggleGroup(name: string) {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  const groups = buildGroups(sales);
   const pendingCount = sales.filter(s => s.print_status === 'pending').length;
   const printedCount = sales.filter(s => s.print_status === 'printed').length;
 
@@ -122,12 +207,11 @@ export function PrintQueue() {
               <div>
                 <h2 className="text-lg font-bold text-white">File d'Impression</h2>
                 <p className="text-sm text-slate-400">
-                  {pendingCount} en attente · {printedCount} imprime(s)
+                  {pendingCount} en attente · {printedCount} imprime(s) · {groups.length} article(s)
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {/* Filter buttons */}
               <div className="flex bg-slate-700 rounded-lg p-0.5 gap-0.5">
                 <button
                   onClick={() => setFilter('pending')}
@@ -171,7 +255,7 @@ export function PrintQueue() {
         </div>
       </div>
 
-      {/* Print orders */}
+      {/* Print orders list grouped by article */}
       {loading ? (
         <div className="flex items-center justify-center h-64 bg-slate-800 rounded-2xl border border-slate-700">
           <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
@@ -182,128 +266,152 @@ export function PrintQueue() {
           <p>Aucune commande d'impression {filter === 'pending' ? 'en attente' : filter === 'printed' ? 'imprimee' : ''}</p>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {sales.map((sale) => {
-            const isPrinted = sale.print_status === 'printed';
-            const items = sale.sale_items ?? [];
+        <div className="space-y-3">
+          {groups.map((group) => {
+            const groupPending = group.orders.filter(o => !o.isPrinted).length;
+            const groupPrinted = group.orders.filter(o => o.isPrinted).length;
+            const totalQty = group.orders.reduce((s, o) => s + o.quantity, 0);
+            const isCollapsed = collapsed.has(group.articleName);
+
             return (
               <div
-                key={sale.id}
-                className={`bg-slate-800 rounded-2xl border overflow-hidden transition-all ${
-                  isPrinted
-                    ? 'border-green-700/40 opacity-75'
-                    : 'border-cyan-700/40 hover:border-cyan-600/60 shadow-lg shadow-cyan-950/20'
-                }`}
+                key={group.articleName}
+                className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden"
               >
-                {/* Card header */}
-                <div className={`px-4 py-3 flex items-center justify-between border-b ${
-                  isPrinted
-                    ? 'bg-green-600/10 border-green-700/30'
-                    : 'bg-cyan-600/10 border-cyan-700/30'
-                }`}>
-                  <div className="flex items-center gap-2">
-                    <Clock className={`w-4 h-4 ${isPrinted ? 'text-green-400' : 'text-cyan-400'}`} />
-                    <span className="text-sm font-bold text-white">
-                      {formatTime(sale.created_at)}
-                    </span>
-                  </div>
-                  <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                    isPrinted
-                      ? 'bg-green-600/20 text-green-400'
-                      : 'bg-cyan-600/20 text-cyan-400 animate-pulse'
-                  }`}>
-                    {isPrinted ? 'IMPRIME' : 'EN ATTENTE'}
-                  </span>
-                </div>
-
-                {/* Card body */}
-                <div className="p-4 space-y-3">
-                  {/* Client */}
-                  <div>
-                    <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Client</p>
-                    <p className="text-base font-bold text-white truncate">{sale.client_name}</p>
-                  </div>
-
-                  {/* Print types */}
-                  <div>
-                    <p className="text-xs text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                      <PackageOpen className="w-3 h-3" />
-                      A imprimer
-                    </p>
-                    {items.length > 0 ? (
-                      <ul className="space-y-1">
-                        {items.map((item, i) => (
-                          <li
-                            key={item.id ?? i}
-                            className="text-sm text-slate-300 bg-slate-700/40 rounded-lg px-2.5 py-1.5 flex items-center justify-between"
-                          >
-                            <span className="truncate">{item.article_name}</span>
-                            <span className="text-slate-400 text-xs shrink-0 ml-2">
-                              {item.pricing_type === 'format'
-                                ? `${item.quantity}x`
-                                : `${item.quantity}x · ${item.surface}m²`}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm text-slate-300 bg-slate-700/40 rounded-lg px-2.5 py-1.5">
-                        {sale.article_name}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Total */}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-700">
-                    <span className="text-xs text-slate-400">Total</span>
-                    <span className="text-sm font-bold text-green-400">
-                      {formatCurrency(sale.total)}
-                    </span>
-                  </div>
-
-                  {/* Printed timestamp */}
-                  {isPrinted && sale.printed_at && (
-                    <div className="flex items-center gap-1.5 text-xs text-green-400/80">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Imprime a {formatTime(sale.printed_at)}
+                {/* Article group header */}
+                <button
+                  onClick={() => toggleGroup(group.articleName)}
+                  className="w-full flex items-center justify-between px-5 py-4 bg-slate-700/40 hover:bg-slate-700/60 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                      groupPending > 0 ? 'bg-cyan-600/20' : 'bg-green-600/20'
+                    }`}>
+                      <PackageOpen className={`w-4 h-4 ${
+                        groupPending > 0 ? 'text-cyan-400' : 'text-green-400'
+                      }`} />
                     </div>
-                  )}
-                </div>
+                    <div className="text-left">
+                      <h3 className="text-sm font-bold text-white">{group.articleName}</h3>
+                      <p className="text-xs text-slate-400">
+                        {group.orders.length} commande(s) · {totalQty} unite(s)
+                        {groupPending > 0 && <span className="text-cyan-400"> · {groupPending} en attente</span>}
+                        {groupPrinted > 0 && <span className="text-green-400"> · {groupPrinted} imprime(s)</span>}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {groupPending > 0 && (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-cyan-600/20 text-cyan-400 border border-cyan-600/30">
+                        {groupPending} a imprimer
+                      </span>
+                    )}
+                    <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                  </div>
+                </button>
 
-                {/* Card actions */}
-                <div className="px-4 pb-4">
-                  {isPrinted ? (
-                    <button
-                      onClick={() => markAsPending(sale.id)}
-                      disabled={updatingId === sale.id}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 rounded-lg font-medium transition-colors text-sm"
-                    >
-                      {updatingId === sale.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>
-                          <RotateCcw className="w-4 h-4" />
-                          Reimprimer
-                        </>
-                      )}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => markAsPrinted(sale.id)}
-                      disabled={updatingId === sale.id}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors text-sm shadow-lg shadow-green-600/20"
-                    >
-                      {updatingId === sale.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>
-                          <Check className="w-4 h-4" />
-                          Valider l'impression
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
+                {/* Orders list under this article */}
+                {!isCollapsed && (
+                  <div className="divide-y divide-slate-700/50">
+                    {group.orders.map((order, idx) => {
+                      const isPrinted = order.isPrinted;
+                      return (
+                        <div
+                          key={`${order.saleId}-${idx}`}
+                          className={`flex items-center gap-4 px-5 py-3 transition-all ${
+                            isPrinted ? 'opacity-60' : 'hover:bg-slate-700/20'
+                          }`}
+                        >
+                          {/* Status indicator */}
+                          <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                            isPrinted ? 'bg-green-500' : 'bg-cyan-500 animate-pulse'
+                          }`} />
+
+                          {/* Time */}
+                          <div className="flex items-center gap-1.5 w-16 shrink-0">
+                            <Clock className="w-3.5 h-3.5 text-slate-500" />
+                            <span className="text-sm font-medium text-slate-300">
+                              {formatTime(order.time)}
+                            </span>
+                          </div>
+
+                          {/* Client */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-white truncate">
+                              {order.clientName}
+                            </p>
+                          </div>
+
+                          {/* Quantity / surface */}
+                          <div className="hidden sm:flex items-center gap-2 shrink-0">
+                            <Layers className="w-3.5 h-3.5 text-slate-500" />
+                            <span className="text-sm text-slate-300">
+                              {order.pricingType === 'format'
+                                ? `${order.quantity}x`
+                                : `${order.quantity}x · ${order.surface}m²`}
+                            </span>
+                          </div>
+
+                          {/* Total */}
+                          <div className="hidden md:block shrink-0 w-28 text-right">
+                            <span className="text-sm font-medium text-green-400">
+                              {formatCurrency(order.saleTotal)}
+                            </span>
+                          </div>
+
+                          {/* Printed timestamp or status badge */}
+                          {isPrinted ? (
+                            <div className="flex items-center gap-1.5 shrink-0 w-32 justify-end">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                              <span className="text-xs text-green-400">
+                                {order.printedAt ? formatTime(order.printedAt) : 'Imprime'}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-cyan-600/20 text-cyan-400 shrink-0">
+                              En attente
+                            </span>
+                          )}
+
+                          {/* Action button */}
+                          <div className="shrink-0">
+                            {isPrinted ? (
+                              <button
+                                onClick={() => markAsPending(order.saleId)}
+                                disabled={updatingId === order.saleId}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 rounded-lg font-medium transition-colors text-xs"
+                              >
+                                {updatingId === order.saleId ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <>
+                                    <RotateCcw className="w-3.5 h-3.5" />
+                                    Reimprimer
+                                  </>
+                                )}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => markAsPrinted(order.saleId)}
+                                disabled={updatingId === order.saleId}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors text-xs shadow-md shadow-green-600/20"
+                              >
+                                {updatingId === order.saleId ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Check className="w-3.5 h-3.5" />
+                                    Valider
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
