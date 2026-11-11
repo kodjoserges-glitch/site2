@@ -2,23 +2,66 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom scrollbar for dark theme */
+:root {
+  --brand-turquoise: #16aabd;
+  --brand-yellow: #d5e000;
+  --brand-sand: #bf9670;
+  --brand-blue: #1b7297;
+  --brand-brown: #7b1c0f;
+  --brand-orange: #f58a19;
+  --brand-ink: #17232b;
+  --brand-surface: #22313a;
+}
+
+body {
+  background: var(--brand-ink);
+}
+
+/* Brand palette applied to the existing interface utilities */
+.bg-blue-600 { background-color: var(--brand-blue) !important; }
+.bg-blue-700 { background-color: #155d7d !important; }
+.bg-blue-500 { background-color: var(--brand-turquoise) !important; }
+.bg-cyan-600 { background-color: var(--brand-turquoise) !important; }
+.bg-cyan-700 { background-color: #108b9d !important; }
+.bg-yellow-600 { background-color: var(--brand-yellow) !important; }
+.bg-orange-600 { background-color: var(--brand-orange) !important; }
+.bg-red-600 { background-color: var(--brand-brown) !important; }
+.bg-slate-900 { background-color: var(--brand-ink) !important; }
+.bg-slate-800 { background-color: var(--brand-surface) !important; }
+
+.text-blue-400, .text-blue-500, .text-blue-600 { color: var(--brand-turquoise) !important; }
+.text-cyan-400, .text-cyan-500 { color: #55d7df !important; }
+.text-yellow-400 { color: var(--brand-yellow) !important; }
+.text-orange-400 { color: #ffad4d !important; }
+.text-red-400 { color: #ef967f !important; }
+
+.border-blue-500, .border-blue-600 { border-color: var(--brand-turquoise) !important; }
+.border-cyan-600 { border-color: var(--brand-turquoise) !important; }
+.border-yellow-600 { border-color: #aab400 !important; }
+.border-red-600 { border-color: var(--brand-brown) !important; }
+
+.hover\\:bg-blue-700:hover { background-color: #155d7d !important; }
+.hover\\:bg-blue-600:hover { background-color: var(--brand-blue) !important; }
+.hover\\:bg-cyan-700:hover { background-color: #108b9d !important; }
+.hover\\:bg-slate-700:hover { background-color: #30444f !important; }
+
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1e293b;
+  background: var(--brand-ink);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: var(--brand-blue);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: var(--brand-turquoise);
 }
 
 /* Print styles */
@@ -55,5 +98,11 @@ input[type="number"] {
 }
 
 *:focus-visible {
-  ring: 2px solid #3b82f6;
+  outline: 2px solid var(--brand-yellow);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--brand-turquoise);
+  color: white;
 }

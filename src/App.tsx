@@ -229,7 +229,7 @@ export default function App() {
   const allowedTabs = ROLE_TABS[userProfile.role];
   const displayName = defaultProfile?.company_name || 'Imprimerie Pro';
   const displaySlogan = defaultProfile?.slogan || 'Systeme de gestion';
-  const displayColor = defaultProfile?.primary_color || '#2563eb';
+  const displayColor = defaultProfile?.primary_color || '#1b7297';
   const RoleIcon = ROLE_ICON[userProfile.role];
 
   const navItems: { id: Tab; label: string; icon: typeof Calculator }[] = [
@@ -244,7 +244,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
-      <header className="bg-slate-800 border-b border-slate-700 sticky top-0 z-50">
+      <header className="bg-slate-800 border-b border-cyan-600/40 sticky top-0 z-50 shadow-lg shadow-black/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
@@ -274,7 +274,7 @@ export default function App() {
                   onClick={() => setActiveTab(item.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
                     activeTab === item.id
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                      ? 'bg-blue-600 text-white shadow-lg shadow-cyan-600/30'
                       : 'text-slate-300 hover:bg-slate-700 hover:text-white'
                   }`}
                 >
@@ -291,7 +291,7 @@ export default function App() {
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
                 >
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center text-white font-bold text-xs">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center text-white font-bold text-xs ring-2 ring-yellow-400/50">
                     {(userProfile.full_name || userProfile.email).charAt(0).toUpperCase()}
                   </div>
                   <div className="text-left">
