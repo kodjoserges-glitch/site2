@@ -13,10 +13,12 @@ import {
   UserX,
   Printer,
   Building2,
+  Settings,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile, UserRole, ROLE_LABELS } from '../types';
 import { CompanySettings } from './CompanySettings';
+import { PriceManagement } from './PriceManagement';
 
 interface Props {
   currentUserId: string;
@@ -55,7 +57,7 @@ export function UserManagement({ currentUserId, onUpdateCompany }: Props) {
   const [loading, setLoading] = useState(true);
   const [pendingRoles, setPendingRoles] = useState<Record<string, UserRole>>({});
   const [saving, setSaving] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<'users' | 'company'>('users');
+  const [activeSection, setActiveSection] = useState<'users' | 'company' | 'prices'>('users');
 
   useEffect(() => {
     fetchProfiles();
@@ -166,7 +168,7 @@ export function UserManagement({ currentUserId, onUpdateCompany }: Props) {
               </div>
             </div>
             {/* Section switcher */}
-            <div className="flex bg-slate-700 rounded-lg p-0.5 gap-0.5">
+            <div className="flex bg-slate-700 rounded-lg p-0.5 gap-0.5 flex-wrap">
               <button
                 onClick={() => setActiveSection('users')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
@@ -189,6 +191,17 @@ export function UserManagement({ currentUserId, onUpdateCompany }: Props) {
                 <Building2 className="w-4 h-4" />
                 Entreprises
               </button>
+              <button
+                onClick={() => setActiveSection('prices')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  activeSection === 'prices'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                <Settings className="w-4 h-4" />
+                Tarifs
+              </button>
             </div>
           </div>
         </div>
@@ -197,6 +210,8 @@ export function UserManagement({ currentUserId, onUpdateCompany }: Props) {
       {/* Content */}
       {activeSection === 'company' ? (
         <CompanySettings onUpdate={onUpdateCompany} />
+      ) : activeSection === 'prices' ? (
+        <PriceManagement />
       ) : (
         <>
           {/* Pending requests */}
