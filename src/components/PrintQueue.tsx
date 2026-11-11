@@ -310,45 +310,40 @@ export function PrintQueue() {
                   </div>
                 </button>
 
-                {/* Orders tiles under this article */}
+                {/* Orders list under this article */}
                 {!isCollapsed && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-4">
+                  <div className="divide-y divide-slate-700/50">
                     {group.orders.map((order, idx) => {
                       const isPrinted = order.isPrinted;
                       return (
                         <div
                           key={`${order.saleId}-${idx}`}
-                          className={`rounded-xl border p-4 flex flex-col gap-3 transition-all ${
-                            isPrinted
-                              ? 'bg-slate-800/60 border-green-700/30 opacity-70'
-                              : 'bg-slate-700/40 border-cyan-700/40 hover:border-cyan-600/60 shadow-lg shadow-cyan-950/20'
+                          className={`flex items-center gap-4 px-5 py-3 transition-all ${
+                            isPrinted ? 'opacity-60' : 'hover:bg-slate-700/20'
                           }`}
                         >
-                          {/* Top row: time + status */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
-                              <Clock className={`w-3.5 h-3.5 ${isPrinted ? 'text-green-500' : 'text-cyan-400'}`} />
-                              <span className="text-sm font-bold text-white">
-                                {formatTime(order.time)}
-                              </span>
-                            </div>
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                              isPrinted
-                                ? 'bg-green-600/20 text-green-400'
-                                : 'bg-cyan-600/20 text-cyan-400 animate-pulse'
-                            }`}>
-                              {isPrinted ? 'IMPRIME' : 'EN ATTENTE'}
+                          {/* Status indicator */}
+                          <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                            isPrinted ? 'bg-green-500' : 'bg-cyan-500 animate-pulse'
+                          }`} />
+
+                          {/* Time */}
+                          <div className="flex items-center gap-1.5 w-16 shrink-0">
+                            <Clock className="w-3.5 h-3.5 text-slate-500" />
+                            <span className="text-sm font-medium text-slate-300">
+                              {formatTime(order.time)}
                             </span>
                           </div>
 
-                          {/* Client name */}
-                          <div>
-                            <p className="text-xs text-slate-400 uppercase tracking-wider mb-0.5">Client</p>
-                            <p className="text-sm font-bold text-white truncate">{order.clientName}</p>
+                          {/* Client */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-white truncate">
+                              {order.clientName}
+                            </p>
                           </div>
 
-                          {/* Qty / surface */}
-                          <div className="flex items-center gap-2">
+                          {/* Quantity / surface */}
+                          <div className="hidden sm:flex items-center gap-2 shrink-0">
                             <Layers className="w-3.5 h-3.5 text-slate-500" />
                             <span className="text-sm text-slate-300">
                               {order.pricingType === 'format'
@@ -358,53 +353,60 @@ export function PrintQueue() {
                           </div>
 
                           {/* Total */}
-                          <div className="flex items-center justify-between pt-1 border-t border-slate-700/50">
-                            <span className="text-xs text-slate-400">Total</span>
-                            <span className="text-sm font-bold text-green-400">
+                          <div className="hidden md:block shrink-0 w-28 text-right">
+                            <span className="text-sm font-medium text-green-400">
                               {formatCurrency(order.saleTotal)}
                             </span>
                           </div>
 
-                          {/* Printed timestamp */}
-                          {isPrinted && order.printedAt && (
-                            <div className="flex items-center gap-1.5 text-xs text-green-400/80">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              Imprime a {formatTime(order.printedAt)}
+                          {/* Printed timestamp or status badge */}
+                          {isPrinted ? (
+                            <div className="flex items-center gap-1.5 shrink-0 w-32 justify-end">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                              <span className="text-xs text-green-400">
+                                {order.printedAt ? formatTime(order.printedAt) : 'Imprime'}
+                              </span>
                             </div>
+                          ) : (
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-cyan-600/20 text-cyan-400 shrink-0">
+                              En attente
+                            </span>
                           )}
 
                           {/* Action button */}
-                          {isPrinted ? (
-                            <button
-                              onClick={() => markAsPending(order.saleId)}
-                              disabled={updatingId === order.saleId}
-                              className="w-full flex items-center justify-center gap-1.5 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 rounded-lg font-medium transition-colors text-xs"
-                            >
-                              {updatingId === order.saleId ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <>
-                                  <RotateCcw className="w-3.5 h-3.5" />
-                                  Reimprimer
-                                </>
-                              )}
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => markAsPrinted(order.saleId)}
-                              disabled={updatingId === order.saleId}
-                              className="w-full flex items-center justify-center gap-1.5 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors text-xs shadow-md shadow-green-600/20"
-                            >
-                              {updatingId === order.saleId ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <>
-                                  <Check className="w-3.5 h-3.5" />
-                                  Valider l'impression
-                                </>
-                              )}
-                            </button>
-                          )}
+                          <div className="shrink-0">
+                            {isPrinted ? (
+                              <button
+                                onClick={() => markAsPending(order.saleId)}
+                                disabled={updatingId === order.saleId}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 rounded-lg font-medium transition-colors text-xs"
+                              >
+                                {updatingId === order.saleId ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <>
+                                    <RotateCcw className="w-3.5 h-3.5" />
+                                    Reimprimer
+                                  </>
+                                )}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => markAsPrinted(order.saleId)}
+                                disabled={updatingId === order.saleId}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors text-xs shadow-md shadow-green-600/20"
+                              >
+                                {updatingId === order.saleId ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Check className="w-3.5 h-3.5" />
+                                    Valider
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
