@@ -115,7 +115,7 @@ export type PaymentStatus = 'paid' | 'advance' | 'unpaid';
 export type DiscountType = 'percentage' | 'fixed';
 export type MajorationType = 'percentage' | 'fixed';
 
-export type UserRole = 'admin' | 'manager' | 'vendeur';
+export type UserRole = 'admin' | 'manager' | 'vendeur' | 'imprimeur';
 
 export type UserStatus = 'pending' | 'approved' | 'rejected';
 
@@ -133,6 +133,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Administrateur',
   manager: 'Manager',
   vendeur: 'Vendeur',
+  imprimeur: 'Imprimeur',
 };
 
 export interface CompanyProfile {

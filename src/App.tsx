@@ -35,18 +35,21 @@ const ROLE_TABS: Record<UserRole, Tab[]> = {
   admin: ['sale', 'history', 'print', 'prices', 'company', 'users', 'accounting'],
   manager: ['sale', 'history', 'print', 'prices', 'company', 'accounting'],
   vendeur: ['sale', 'print'],
+  imprimeur: ['print'],
 };
 
 const ROLE_ICON: Record<UserRole, typeof Shield> = {
   admin: ShieldAlert,
   manager: ShieldCheck,
   vendeur: Shield,
+  imprimeur: Printer,
 };
 
 const ROLE_COLOR: Record<UserRole, string> = {
   admin: 'text-red-400',
   manager: 'text-yellow-400',
   vendeur: 'text-blue-400',
+  imprimeur: 'text-cyan-400',
 };
 
 export default function App() {
@@ -296,7 +299,7 @@ export default function App() {
                     </p>
                     <div className={`flex items-center gap-1 text-xs ${ROLE_COLOR[userProfile.role]}`}>
                       <RoleIcon className="w-3 h-3" />
-                      {userProfile.role === 'admin' ? 'Administrateur' : userProfile.role === 'manager' ? 'Manager' : 'Vendeur'}
+                      {userProfile.role === 'admin' ? 'Administrateur' : userProfile.role === 'manager' ? 'Manager' : userProfile.role === 'imprimeur' ? 'Imprimeur' : 'Vendeur'}
                     </div>
                   </div>
                   <ChevronDown className="w-4 h-4 text-slate-400" />

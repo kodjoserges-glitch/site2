@@ -11,6 +11,7 @@ import {
   CheckCircle,
   XCircle,
   UserX,
+  Printer,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile, UserRole, ROLE_LABELS } from '../types';
@@ -37,6 +38,12 @@ const ROLE_CONFIG: Record<UserRole, { label: string; color: string; icon: typeof
     color: 'text-blue-400 bg-blue-600/10 border-blue-600/30',
     icon: Shield,
     description: 'Acces uniquement a : nouvelle vente',
+  },
+  imprimeur: {
+    label: 'Imprimeur',
+    color: 'text-cyan-400 bg-cyan-600/10 border-cyan-600/30',
+    icon: Printer,
+    description: 'Acces uniquement a : file d\'attente d\'impression',
   },
 };
 
@@ -228,7 +235,7 @@ export function UserManagement({ currentUserId }: Props) {
       )}
 
       {/* Role Legend */}
-      <div className="grid sm:grid-cols-3 gap-4">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {(Object.entries(ROLE_CONFIG) as [UserRole, typeof ROLE_CONFIG[UserRole]][]).map(([role, cfg]) => {
           const Icon = cfg.icon;
           return (
