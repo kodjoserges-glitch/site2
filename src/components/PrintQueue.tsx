@@ -266,7 +266,7 @@ export function PrintQueue() {
           <p>Aucune commande d'impression {filter === 'pending' ? 'en attente' : filter === 'printed' ? 'imprimee' : ''}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-3">
           {groups.map((group) => {
             const groupPending = group.orders.filter(o => !o.isPrinted).length;
             const groupPrinted = group.orders.filter(o => o.isPrinted).length;
@@ -276,93 +276,116 @@ export function PrintQueue() {
             return (
               <div
                 key={group.articleName}
-                className={`rounded-2xl border overflow-hidden flex flex-col transition-all ${
-                  groupPending > 0
-                    ? 'bg-slate-800 border-cyan-700/40 hover:border-cyan-600/60 shadow-lg shadow-cyan-950/20'
-                    : 'bg-slate-800/70 border-green-700/30'
-                }`}
+                className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden"
               >
-                {/* Article tile header */}
+                {/* Article group header */}
                 <button
                   onClick={() => toggleGroup(group.articleName)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-slate-700/40 hover:bg-slate-700/60 transition-colors"
+                  className="w-full flex items-center justify-between px-5 py-4 bg-slate-700/40 hover:bg-slate-700/60 transition-colors"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
                       groupPending > 0 ? 'bg-cyan-600/20' : 'bg-green-600/20'
                     }`}>
                       <PackageOpen className={`w-4 h-4 ${
                         groupPending > 0 ? 'text-cyan-400' : 'text-green-400'
                       }`} />
                     </div>
-                    <div className="text-left min-w-0">
-                      <h3 className="text-sm font-bold text-white truncate">{group.articleName}</h3>
+                    <div className="text-left">
+                      <h3 className="text-sm font-bold text-white">{group.articleName}</h3>
                       <p className="text-xs text-slate-400">
-                        {group.orders.length} cmd · {totalQty} unite(s)
+                        {group.orders.length} commande(s) · {totalQty} unite(s)
+                        {groupPending > 0 && <span className="text-cyan-400"> · {groupPending} en attente</span>}
+                        {groupPrinted > 0 && <span className="text-green-400"> · {groupPrinted} imprime(s)</span>}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {groupPending > 0 ? (
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-600/20 text-cyan-400 border border-cyan-600/30">
+                  <div className="flex items-center gap-3">
+                    {groupPending > 0 && (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-cyan-600/20 text-cyan-400 border border-cyan-600/30">
                         {groupPending} a imprimer
                       </span>
-                    ) : (
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-600/20 text-green-400 border border-green-600/30">
-                        Tout imprime
-                      </span>
                     )}
-                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                    <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
                   </div>
                 </button>
 
-                {/* Orders list inside the article tile */}
+                {/* Orders tiles under this article */}
                 {!isCollapsed && (
-                  <div className="divide-y divide-slate-700/50 flex-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-4">
                     {group.orders.map((order, idx) => {
                       const isPrinted = order.isPrinted;
                       return (
                         <div
                           key={`${order.saleId}-${idx}`}
-                          className={`flex items-center gap-3 px-4 py-2.5 transition-all ${
-                            isPrinted ? 'opacity-60' : 'hover:bg-slate-700/20'
+                          className={`rounded-xl border p-4 flex flex-col gap-3 transition-all ${
+                            isPrinted
+                              ? 'bg-slate-800/60 border-green-700/30 opacity-70'
+                              : 'bg-slate-700/40 border-cyan-700/40 hover:border-cyan-600/60 shadow-lg shadow-cyan-950/20'
                           }`}
                         >
-                          {/* Status dot */}
-                          <div className={`w-2 h-2 rounded-full shrink-0 ${
-                            isPrinted ? 'bg-green-500' : 'bg-cyan-500 animate-pulse'
-                          }`} />
+                          {/* Top row: time + status */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                              <Clock className={`w-3.5 h-3.5 ${isPrinted ? 'text-green-500' : 'text-cyan-400'}`} />
+                              <span className="text-sm font-bold text-white">
+                                {formatTime(order.time)}
+                              </span>
+                            </div>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                              isPrinted
+                                ? 'bg-green-600/20 text-green-400'
+                                : 'bg-cyan-600/20 text-cyan-400 animate-pulse'
+                            }`}>
+                              {isPrinted ? 'IMPRIME' : 'EN ATTENTE'}
+                            </span>
+                          </div>
 
-                          {/* Time */}
-                          <span className="text-xs font-medium text-slate-300 shrink-0 w-11">
-                            {formatTime(order.time)}
-                          </span>
+                          {/* Client name */}
+                          <div>
+                            <p className="text-xs text-slate-400 uppercase tracking-wider mb-0.5">Client</p>
+                            <p className="text-sm font-bold text-white truncate">{order.clientName}</p>
+                          </div>
 
-                          {/* Client */}
-                          <span className="text-sm font-semibold text-white truncate flex-1 min-w-0">
-                            {order.clientName}
-                          </span>
+                          {/* Qty / surface */}
+                          <div className="flex items-center gap-2">
+                            <Layers className="w-3.5 h-3.5 text-slate-500" />
+                            <span className="text-sm text-slate-300">
+                              {order.pricingType === 'format'
+                                ? `${order.quantity}x`
+                                : `${order.quantity}x · ${order.surface}m²`}
+                            </span>
+                          </div>
 
-                          {/* Qty */}
-                          <span className="text-xs text-slate-400 shrink-0 hidden sm:inline">
-                            {order.pricingType === 'format'
-                              ? `${order.quantity}x`
-                              : `${order.quantity}x · ${order.surface}m²`}
-                          </span>
+                          {/* Total */}
+                          <div className="flex items-center justify-between pt-1 border-t border-slate-700/50">
+                            <span className="text-xs text-slate-400">Total</span>
+                            <span className="text-sm font-bold text-green-400">
+                              {formatCurrency(order.saleTotal)}
+                            </span>
+                          </div>
 
-                          {/* Action */}
+                          {/* Printed timestamp */}
+                          {isPrinted && order.printedAt && (
+                            <div className="flex items-center gap-1.5 text-xs text-green-400/80">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              Imprime a {formatTime(order.printedAt)}
+                            </div>
+                          )}
+
+                          {/* Action button */}
                           {isPrinted ? (
                             <button
                               onClick={() => markAsPending(order.saleId)}
                               disabled={updatingId === order.saleId}
-                              className="flex items-center gap-1 px-2 py-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 rounded-lg font-medium transition-colors text-xs shrink-0"
+                              className="w-full flex items-center justify-center gap-1.5 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 rounded-lg font-medium transition-colors text-xs"
                             >
                               {updatingId === order.saleId ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
                               ) : (
                                 <>
-                                  <RotateCcw className="w-3 h-3" />
-                                  <span className="hidden lg:inline">Reimprimer</span>
+                                  <RotateCcw className="w-3.5 h-3.5" />
+                                  Reimprimer
                                 </>
                               )}
                             </button>
@@ -370,14 +393,14 @@ export function PrintQueue() {
                             <button
                               onClick={() => markAsPrinted(order.saleId)}
                               disabled={updatingId === order.saleId}
-                              className="flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors text-xs shrink-0 shadow-md shadow-green-600/20"
+                              className="w-full flex items-center justify-center gap-1.5 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors text-xs shadow-md shadow-green-600/20"
                             >
                               {updatingId === order.saleId ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
                               ) : (
                                 <>
-                                  <Check className="w-3 h-3" />
-                                  <span className="hidden lg:inline">Valider</span>
+                                  <Check className="w-3.5 h-3.5" />
+                                  Valider l'impression
                                 </>
                               )}
                             </button>
