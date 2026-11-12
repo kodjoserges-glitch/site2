@@ -14,6 +14,7 @@ import {
   Trash2,
   XCircle,
   Calendar,
+  User,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Sale, UserRole } from '../types';
@@ -44,6 +45,7 @@ interface OrderEntry {
   saleTotal: number;
   printStatus: 'pending' | 'printed' | 'reprint_requested';
   printedAt: string | null;
+  sellerName: string | null;
 }
 
 function buildGroups(sales: Sale[]): GroupedItem[] {
@@ -83,6 +85,7 @@ function buildGroups(sales: Sale[]): GroupedItem[] {
         saleTotal: sale.total,
         printStatus: sale.print_status,
         printedAt: sale.printed_at,
+        sellerName: sale.seller_name,
       });
       map.set(e.articleName, list);
     }
@@ -662,6 +665,12 @@ export function PrintQueue({ userRole, userName }: Props) {
                             <p className="text-xs text-slate-500 truncate">
                               N° {order.invoiceNumber}
                             </p>
+                            {order.sellerName && (
+                              <p className="text-xs text-cyan-400/80 truncate flex items-center gap-1 mt-0.5">
+                                <User className="w-3 h-3" />
+                                {order.sellerName}
+                              </p>
+                            )}
                           </div>
 
                           {/* Quantity / surface */}
