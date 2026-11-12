@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Settings,
   Plus,
@@ -31,6 +31,7 @@ export function PriceManagement() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const initialLoad = useRef(true);
   const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
 
   // Category modal
@@ -52,7 +53,9 @@ export function PriceManagement() {
   useRealtime(['categories', 'articles'], fetchAll);
 
   async function fetchAll() {
-    setLoading(true);
+    if (!initialLoad.current) {
+      setLoading(false);
+    }
     try {
       const [catRes, artRes] = await Promise.all([
         supabase.from('categories').select('*').order('created_at'),
@@ -63,11 +66,16 @@ export function PriceManagement() {
       const cats = catRes.data || [];
       setCategories(cats);
       setArticles(artRes.data || []);
-      if (!selectedCatId && cats.length > 0) setSelectedCatId(cats[0].id);
+      if (selectedCatId && !cats.find(c => c.id === selectedCatId)) {
+        setSelectedCatId(cats[0]?.id ?? null);
+      } else if (!selectedCatId && cats.length > 0) {
+        setSelectedCatId(cats[0].id);
+      }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+      initialLoad.current = false;
     }
   }
 
@@ -131,7 +139,7 @@ export function PriceManagement() {
     const isFormat = artForm.pricing_type === 'format';
     if (!artForm.name.trim()) return;
     if (isFormat && (!artForm.format || !artForm.price_per_unit)) return;
-    if (!isFormat && !artForm.price_per_sqm) return;
+    if (!isFormat && (!artForm.price_per_sqm || isNaN(parseFloat(artForm.price_per_sqm)))) return;
     setSavingArt(true);
     try {
       const payload = {
@@ -271,7 +279,7 @@ export function PriceManagement() {
                           <p className="font-medium text-white">{article.name}</p>
                           {isFormat && article.format ? (
                             <p className="text-xs text-slate-400">
-                              Format {article.format} · {fmt ? `${(fmt.width * 100).toFixed(0)}×${(fmt.height * 100).toFixed(0)} cm` : ''}
+                              Format {article.format}{fmt ? ` · ${(fmt.width * 100).toFixed(0)}×${(fmt.height * 100).toFixed(0)} cm` : ''}
                             </p>
                           ) : (
                             <p className="text-xs text-slate-400">Tarification au m²</p>
@@ -285,7 +293,7 @@ export function PriceManagement() {
                             </>
                           ) : (
                             <>
-                              <p className="font-bold text-green-400">{formatCurrency(article.price_per_sqm)}</p>
+                              <p className="font-bold text-green-400">{formatCurrency(article.price_per_sqm ?? 0)}</p>
                               <p className="text-xs text-slate-500">/ m²</p>
                             </>
                           )}

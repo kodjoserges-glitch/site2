@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { LayoutDashboard, Briefcase, Receipt, RefreshCw, Download, Calendar, BookOpen, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Sale, Service, Expense } from '../types';
@@ -73,6 +73,7 @@ export function Comptabilite() {
   const [customEnd, setCustomEnd] = useState('');
   const [subTab, setSubTab] = useState<SubTab>('dashboard');
   const [loading, setLoading] = useState(true);
+  const initialLoad = useRef(true);
 
   const [sales, setSales] = useState<Sale[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -88,7 +89,7 @@ export function Comptabilite() {
   useRealtime(['sales', 'services', 'expenses'], fetchAll);
 
   async function fetchAll() {
-    setLoading(true);
+    if (!initialLoad.current) setLoading(false);
     try {
       const [salesRes, servicesRes, expensesRes] = await Promise.all([
         supabase.from('sales').select('*')
@@ -111,7 +112,7 @@ export function Comptabilite() {
       setServices(servicesRes.data || []);
       setExpenses(expensesRes.data || []);
     } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+    finally { setLoading(false); initialLoad.current = false; }
   }
 
   const totalRecettes = sales.reduce((s, v) => s + v.total, 0) + services.reduce((s, v) => s + v.amount, 0);

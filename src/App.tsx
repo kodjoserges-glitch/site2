@@ -345,7 +345,7 @@ export default function App() {
             </nav>
 
             <div className="flex items-center gap-2">
-              <NotificationBell userRole={userProfile.role} userName={userProfile.full_name || userProfile.email} />
+              <NotificationBell userRole={userProfile.role} userName={userProfile.full_name || userProfile.email} userId={userProfile.id} />
               <div className="relative hidden md:block">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}

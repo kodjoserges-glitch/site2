@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Users,
   Loader2,
@@ -60,6 +60,7 @@ export function UserManagement({ currentUserId, onUpdateCompany }: Props) {
   const [pendingRoles, setPendingRoles] = useState<Record<string, UserRole>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<'users' | 'company' | 'prices'>('users');
+  const initialLoad = useRef(true);
 
   useEffect(() => {
     fetchProfiles();
@@ -68,7 +69,7 @@ export function UserManagement({ currentUserId, onUpdateCompany }: Props) {
   useRealtime(['user_profiles'], fetchProfiles);
 
   async function fetchProfiles() {
-    setLoading(true);
+    if (!initialLoad.current) setLoading(false);
     try {
       const { data, error } = await supabase
         .from('user_profiles')
@@ -80,6 +81,7 @@ export function UserManagement({ currentUserId, onUpdateCompany }: Props) {
       console.error(err);
     } finally {
       setLoading(false);
+      initialLoad.current = false;
     }
   }
 
@@ -116,6 +118,7 @@ export function UserManagement({ currentUserId, onUpdateCompany }: Props) {
         .eq('id', userId);
       if (error) throw error;
       setProfiles(prev => prev.map(p => (p.id === userId ? { ...p, status: 'approved', role } : p)));
+      setPendingRoles(prev => { const next = { ...prev }; delete next[userId]; return next; });
     } catch (err) {
       console.error(err);
       alert("Erreur lors de l'approbation");

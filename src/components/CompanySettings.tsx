@@ -127,7 +127,8 @@ export function CompanySettings({ onUpdate }: Props) {
       if (error) throw error;
       const updated = profiles.filter(p => p.id !== id);
       if (profile?.is_default && updated.length > 0) {
-        await supabase.from('company_settings').update({ is_default: true }).eq('id', updated[0].id);
+        const { error: reassignErr } = await supabase.from('company_settings').update({ is_default: true }).eq('id', updated[0].id);
+        if (reassignErr) throw reassignErr;
       }
       await fetchProfiles();
       onUpdate();
@@ -139,12 +140,15 @@ export function CompanySettings({ onUpdate }: Props) {
 
   async function handleSetDefault(id: string) {
     try {
-      await supabase.from('company_settings').update({ is_default: false }).neq('id', id);
-      await supabase.from('company_settings').update({ is_default: true }).eq('id', id);
+      const { error: err1 } = await supabase.from('company_settings').update({ is_default: false }).neq('id', id);
+      if (err1) throw err1;
+      const { error: err2 } = await supabase.from('company_settings').update({ is_default: true }).eq('id', id);
+      if (err2) throw err2;
       await fetchProfiles();
       onUpdate();
     } catch (err) {
       console.error(err);
+      alert('Erreur lors du changement de profil par defaut');
     }
   }
 

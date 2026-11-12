@@ -19,6 +19,9 @@ import {
   CreditCard,
   CheckCircle2,
   RotateCcw,
+  TrendingUp,
+  Wallet,
+  AlertCircle,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Sale, CompanyProfile, UserProfile } from '../types';
@@ -498,7 +501,7 @@ export function SalesHistory({ defaultProfile, currentUser }: Props) {
         <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-green-600/20 rounded-lg flex items-center justify-center">
-              <span className="text-xl font-bold text-green-400">FCA</span>
+              <TrendingUp className="w-5 h-5 text-green-400" />
             </div>
             <div>
               <p className="text-sm text-slate-400">Total Journalier</p>
@@ -509,7 +512,7 @@ export function SalesHistory({ defaultProfile, currentUser }: Props) {
         <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-600/20 rounded-lg flex items-center justify-center">
-              <span className="text-xl font-bold text-blue-400">$</span>
+              <Wallet className="w-5 h-5 text-blue-400" />
             </div>
             <div>
               <p className="text-sm text-slate-400">Montant Encaisse</p>
@@ -520,7 +523,7 @@ export function SalesHistory({ defaultProfile, currentUser }: Props) {
         <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-orange-600/20 rounded-lg flex items-center justify-center">
-              <span className="text-xl font-bold text-orange-400">!</span>
+              <AlertCircle className="w-5 h-5 text-orange-400" />
             </div>
             <div>
               <p className="text-sm text-slate-400">Reste a Payer</p>

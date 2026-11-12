@@ -6,6 +6,7 @@ import { Notification, NotificationType, UserRole } from '../types';
 interface Props {
   userRole: UserRole;
   userName: string;
+  userId: string;
 }
 
 const NOTIF_ICON: Record<NotificationType, typeof Bell> = {
@@ -34,7 +35,7 @@ function timeAgo(date: string): string {
   return `Il y a ${days} j`;
 }
 
-export function NotificationBell(_props: Props) {
+export function NotificationBell({ userId }: Props) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const [bellAnim, setBellAnim] = useState(false);
@@ -68,10 +69,13 @@ export function NotificationBell(_props: Props) {
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
+        .or(`target_user_id.eq.${userId},target_user_id.is.null`)
         .order('created_at', { ascending: false })
         .limit(30);
       if (error) throw error;
-      const list = data || [];
+      const list = (data || []).filter((n: Notification) =>
+        !n.target_user_id || n.target_user_id === userId
+      );
       const newUnread = list.filter((n: Notification) => !n.read).length;
       if (newUnread > prevCountRef.current && prevCountRef.current !== 0) {
         playSound();
