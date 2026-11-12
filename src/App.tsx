@@ -66,6 +66,7 @@ export default function App() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [profiles, setProfiles] = useState<CompanyProfile[]>([]);
   const [defaultProfile, setDefaultProfile] = useState<CompanyProfile | null>(null);
+  const [reprintCount, setReprintCount] = useState(0);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -106,6 +107,25 @@ export default function App() {
   }, [session]);
 
   useRealtime(['company_settings'], fetchCompanyProfiles, !!session);
+
+  useEffect(() => {
+    if (!session) return;
+    fetchReprintCount();
+  }, [session]);
+
+  useRealtime(['sales'], () => { fetchReprintCount(); }, !!session);
+
+  async function fetchReprintCount() {
+    try {
+      const { count } = await supabase
+        .from('sales')
+        .select('*', { count: 'exact', head: true })
+        .eq('print_status', 'reprint_requested');
+      setReprintCount(count ?? 0);
+    } catch {
+      // non-critical
+    }
+  }
 
   async function fetchCompanyProfiles() {
     try {
@@ -315,6 +335,11 @@ export default function App() {
                 >
                   <item.icon className="w-5 h-5" />
                   {item.label}
+                  {item.id === 'print' && reprintCount > 0 && (
+                    <span className="ml-1 min-w-[18px] h-[18px] flex items-center justify-center bg-orange-500 text-white text-[10px] font-bold rounded-full px-1 animate-pulse">
+                      {reprintCount > 9 ? '9+' : reprintCount}
+                    </span>
+                  )}
                 </button>
               ))}
             </nav>
@@ -387,6 +412,11 @@ export default function App() {
               >
                 <item.icon className="w-5 h-5" />
                 {item.label}
+                {item.id === 'print' && reprintCount > 0 && (
+                  <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center bg-orange-500 text-white text-[10px] font-bold rounded-full px-1">
+                    {reprintCount > 9 ? '9+' : reprintCount}
+                  </span>
+                )}
               </button>
             ))}
             <div className="border-t border-slate-700 pt-2">

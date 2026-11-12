@@ -263,12 +263,14 @@ export async function sendNotification(
   title: string,
   message: string,
   actorName: string,
-  saleId?: string
+  saleId?: string,
+  targetUserId?: string
 ): Promise<void> {
   try {
     await supabase.from('notifications').insert({
       type,
       target_role: targetRole,
+      target_user_id: targetUserId ?? null,
       title,
       message,
       actor_name: actorName,

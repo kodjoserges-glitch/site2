@@ -156,6 +156,7 @@ export type NotificationType = 'new_sale' | 'reprint_request' | 'reprint_validat
 export interface Notification {
   id: string;
   target_role: UserRole | 'all';
+  target_user_id: string | null;
   type: NotificationType;
   title: string;
   message: string;

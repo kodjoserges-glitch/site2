@@ -236,6 +236,7 @@ export function PrintQueue({ userRole, userName }: Props) {
         })
         .eq('id', saleId);
       if (error) throw error;
+      const sale = sales.find(s => s.id === saleId);
       setSales(prev =>
         filter === 'pending' || filter === 'reprint_requested'
           ? prev.filter(s => s.id !== saleId)
@@ -251,7 +252,8 @@ export function PrintQueue({ userRole, userName }: Props) {
         'Impression terminee',
         `La commande N° ${invoiceNumber} a ete imprimee par ${userName}.`,
         userName,
-        saleId
+        saleId,
+        sale?.seller_id ?? undefined
       );
     } catch (err) {
       console.error('Error marking as printed:', err);
@@ -272,6 +274,7 @@ export function PrintQueue({ userRole, userName }: Props) {
         })
         .eq('id', saleId);
       if (error) throw error;
+      const sale = sales.find(s => s.id === saleId);
       setSales(prev =>
         filter === 'printed'
           ? prev.filter(s => s.id !== saleId)
@@ -287,7 +290,8 @@ export function PrintQueue({ userRole, userName }: Props) {
         'Reimpression demandee',
         `L'imprimeur ${userName} demande une reimpression de la commande N° ${invoiceNumber}. Validez pour relancer l'impression.`,
         userName,
-        saleId
+        saleId,
+        sale?.seller_id ?? undefined
       );
     } catch (err) {
       console.error('Error requesting reprint:', err);

@@ -18,6 +18,7 @@ import {
   BadgeCheck,
   CreditCard,
   CheckCircle2,
+  RotateCcw,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Sale, CompanyProfile, UserProfile } from '../types';
@@ -588,6 +589,9 @@ export function SalesHistory({ defaultProfile, currentUser }: Props) {
                   <th className="text-center py-3 px-4 text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Statut
                   </th>
+                  <th className="text-center py-3 px-4 text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    Impression
+                  </th>
                   <th className="text-left py-3 px-4 text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Vendeur
                   </th>
@@ -666,6 +670,26 @@ export function SalesHistory({ defaultProfile, currentUser }: Props) {
                             <span className="text-xs text-slate-500 flex items-center gap-0.5">
                               <BadgeCheck className="w-3 h-3 text-green-600" />
                               {new Date(sale.settled_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          {sale.print_status === 'printed' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-green-600/20 text-green-400">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Imprime
+                            </span>
+                          ) : sale.print_status === 'reprint_requested' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-orange-600/20 text-orange-400">
+                              <RotateCcw className="w-3 h-3" />
+                              Reimpression
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-cyan-600/20 text-cyan-400">
+                              <Printer className="w-3 h-3" />
+                              En attente
                             </span>
                           )}
                         </div>
