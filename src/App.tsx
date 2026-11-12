@@ -37,7 +37,7 @@ type Tab = 'sale' | 'history' | 'print' | 'users' | 'accounting' | 'prestations'
 
 const ROLE_TABS: Record<UserRole, Tab[]> = {
   admin: ['sale', 'history', 'print', 'users', 'accounting'],
-  manager: ['sale', 'history', 'print', 'users', 'accounting', 'depenses'],
+  manager: ['sale', 'history', 'print', 'prestations', 'depenses', 'recap', 'users', 'accounting'],
   vendeur: ['sale', 'history', 'print', 'prestations', 'recap'],
   imprimeur: ['print'],
 };
@@ -414,13 +414,13 @@ export default function App() {
           <UserManagement currentUserId={userProfile.id} onUpdateCompany={fetchCompanyProfiles} />
         )}
         {activeTab === 'accounting' && <Comptabilite />}
-        {activeTab === 'prestations' && userProfile.role === 'vendeur' && (
+        {activeTab === 'prestations' && (userProfile.role === 'vendeur' || userProfile.role === 'manager') && (
           <VendeurPrestations currentUser={userProfile} />
         )}
         {activeTab === 'depenses' && userProfile.role === 'manager' && (
           <VendeurDepenses />
         )}
-        {activeTab === 'recap' && userProfile.role === 'vendeur' && (
+        {activeTab === 'recap' && (userProfile.role === 'vendeur' || userProfile.role === 'manager') && (
           <DailyRecap currentUser={userProfile} />
         )}
       </main>
