@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bell, X, CheckCheck, Trash2, ShoppingCart, Printer, RotateCcw, CheckCircle } from 'lucide-react';
+import { Bell, X, CheckCheck, Trash2, ShoppingCart, Printer, RotateCcw, CheckCircle, Package, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Notification, NotificationType, UserRole } from '../types';
 
@@ -14,6 +14,8 @@ const NOTIF_ICON: Record<NotificationType, typeof Bell> = {
   reprint_request: RotateCcw,
   reprint_validated: CheckCircle,
   print_done: Printer,
+  office_sale: Package,
+  low_stock: AlertTriangle,
 };
 
 const NOTIF_COLOR: Record<NotificationType, string> = {
@@ -21,6 +23,8 @@ const NOTIF_COLOR: Record<NotificationType, string> = {
   reprint_request: 'text-orange-400 bg-orange-600/20',
   reprint_validated: 'text-green-400 bg-green-600/20',
   print_done: 'text-cyan-400 bg-cyan-600/20',
+  office_sale: 'text-emerald-400 bg-emerald-600/20',
+  low_stock: 'text-red-400 bg-red-600/20',
 };
 
 function timeAgo(date: string): string {
@@ -35,7 +39,7 @@ function timeAgo(date: string): string {
   return `Il y a ${days} j`;
 }
 
-export function NotificationBell({ userId }: Props) {
+export function NotificationBell({ userRole, userId }: Props) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const [bellAnim, setBellAnim] = useState(false);
@@ -64,18 +68,25 @@ export function NotificationBell({ userId }: Props) {
     }
   }, []);
 
+  const isManager = userRole === 'manager' || userRole === 'admin';
+
   const fetchNotifications = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('notifications')
         .select('*')
-        .or(`target_user_id.eq.${userId},target_user_id.is.null`)
         .order('created_at', { ascending: false })
-        .limit(30);
+        .limit(50);
+      if (!isManager) {
+        query = query.or(`target_user_id.eq.${userId},target_user_id.is.null`);
+      }
+      const { data, error } = await query;
       if (error) throw error;
-      const list = (data || []).filter((n: Notification) =>
-        !n.target_user_id || n.target_user_id === userId
-      );
+      const list = isManager
+        ? (data || [])
+        : (data || []).filter((n: Notification) =>
+            !n.target_user_id || n.target_user_id === userId
+          );
       const newUnread = list.filter((n: Notification) => !n.read).length;
       if (newUnread > prevCountRef.current && prevCountRef.current !== 0) {
         playSound();
@@ -87,7 +98,7 @@ export function NotificationBell({ userId }: Props) {
     } catch (err) {
       console.error('Error fetching notifications:', err);
     }
-  }, [playSound]);
+  }, [playSound, isManager, userId]);
 
   useEffect(() => {
     fetchNotifications();

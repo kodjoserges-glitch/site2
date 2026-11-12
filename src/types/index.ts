@@ -151,7 +151,7 @@ export interface CompanyProfile {
   updated_at: string;
 }
 
-export type NotificationType = 'new_sale' | 'reprint_request' | 'reprint_validated' | 'print_done';
+export type NotificationType = 'new_sale' | 'reprint_request' | 'reprint_validated' | 'print_done' | 'office_sale' | 'low_stock';
 
 export interface Notification {
   id: string;
@@ -164,4 +164,59 @@ export interface Notification {
   actor_name: string;
   read: boolean;
   created_at: string;
+}
+
+// ---- Articles bureautique & consommables ----
+
+export interface OfficeItem {
+  id: string;
+  name: string;
+  sku: string | null;
+  category: string;
+  unit_price: number;
+  cost_price: number;
+  stock_quantity: number;
+  min_stock: number;
+  unit: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type StockMovementType = 'in' | 'out' | 'adjustment';
+
+export interface StockMovement {
+  id: string;
+  item_id: string;
+  movement_type: StockMovementType;
+  quantity: number;
+  reason: string | null;
+  actor_id: string | null;
+  actor_name: string | null;
+  created_at: string;
+}
+
+export interface OfficeSaleItem {
+  item_id: string;
+  name: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+}
+
+export type OfficePaymentStatus = 'paid' | 'advance' | 'unpaid';
+
+export interface OfficeSale {
+  id: string;
+  invoice_number: string;
+  client_name: string;
+  total_amount: number;
+  amount_paid: number;
+  payment_status: OfficePaymentStatus;
+  seller_id: string | null;
+  seller_name: string | null;
+  items_json: OfficeSaleItem[];
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }

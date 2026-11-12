@@ -18,6 +18,7 @@ import {
   Briefcase,
   Calendar,
   Receipt,
+  Package,
 } from 'lucide-react';
 import { NewSale } from './components/NewSale';
 import { SalesHistory } from './components/SalesHistory';
@@ -29,16 +30,17 @@ import { NotificationBell } from './components/NotificationBell';
 import { VendeurPrestations } from './components/VendeurPrestations';
 import { VendeurDepenses } from './components/VendeurDepenses';
 import { DailyRecap } from './components/DailyRecap';
+import { OfficeArticles } from './components/OfficeArticles';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { useRealtime } from './lib/useRealtime';
 import { CompanyProfile, UserProfile, UserRole } from './types';
 
-type Tab = 'sale' | 'history' | 'print' | 'users' | 'accounting' | 'prestations' | 'recap' | 'depenses';
+type Tab = 'sale' | 'history' | 'print' | 'users' | 'accounting' | 'prestations' | 'recap' | 'depenses' | 'articles';
 
 const ROLE_TABS: Record<UserRole, Tab[]> = {
-  admin: ['sale', 'history', 'print', 'users', 'accounting'],
-  manager: ['sale', 'history', 'print', 'prestations', 'depenses', 'recap'],
-  vendeur: ['sale', 'history', 'print', 'prestations', 'recap'],
+  admin: ['sale', 'articles', 'history', 'print', 'users', 'accounting'],
+  manager: ['sale', 'articles', 'history', 'print', 'prestations', 'depenses', 'recap'],
+  vendeur: ['sale', 'articles', 'history', 'print', 'prestations', 'recap'],
   imprimeur: ['print'],
 };
 
@@ -288,6 +290,7 @@ export default function App() {
 
   const navItems: { id: Tab; label: string; icon: typeof Calculator }[] = [
     { id: 'sale', label: 'Nouvelle Vente', icon: Calculator },
+    { id: 'articles', label: 'Articles', icon: Package },
     { id: 'history', label: 'Historique', icon: History },
     { id: 'print', label: 'Impression', icon: Printer },
     { id: 'prestations', label: 'Prestations', icon: Briefcase },
@@ -452,6 +455,9 @@ export default function App() {
         )}
         {activeTab === 'recap' && (userProfile.role === 'vendeur' || userProfile.role === 'manager') && (
           <DailyRecap currentUser={userProfile} />
+        )}
+        {activeTab === 'articles' && (
+          <OfficeArticles currentUser={userProfile} />
         )}
       </main>
     </div>
