@@ -37,7 +37,7 @@ type Tab = 'sale' | 'history' | 'print' | 'users' | 'accounting' | 'prestations'
 
 const ROLE_TABS: Record<UserRole, Tab[]> = {
   admin: ['sale', 'history', 'print', 'users', 'accounting'],
-  manager: ['sale', 'history', 'print', 'prestations', 'depenses', 'recap', 'users', 'accounting'],
+  manager: ['sale', 'history', 'print', 'prestations', 'depenses', 'recap'],
   vendeur: ['sale', 'history', 'print', 'prestations', 'recap'],
   imprimeur: ['print'],
 };
