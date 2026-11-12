@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   Briefcase,
   Calendar,
+  Receipt,
 } from 'lucide-react';
 import { NewSale } from './components/NewSale';
 import { SalesHistory } from './components/SalesHistory';
@@ -26,17 +27,18 @@ import { Comptabilite } from './components/Comptabilite';
 import { PrintQueue } from './components/PrintQueue';
 import { NotificationBell } from './components/NotificationBell';
 import { VendeurPrestations } from './components/VendeurPrestations';
+import { VendeurDepenses } from './components/VendeurDepenses';
 import { DailyRecap } from './components/DailyRecap';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { useRealtime } from './lib/useRealtime';
 import { CompanyProfile, UserProfile, UserRole } from './types';
 
-type Tab = 'sale' | 'history' | 'print' | 'users' | 'accounting' | 'prestations' | 'recap';
+type Tab = 'sale' | 'history' | 'print' | 'users' | 'accounting' | 'prestations' | 'recap' | 'depenses';
 
 const ROLE_TABS: Record<UserRole, Tab[]> = {
   admin: ['sale', 'history', 'print', 'users', 'accounting'],
   manager: ['sale', 'history', 'print', 'users', 'accounting'],
-  vendeur: ['sale', 'history', 'print', 'prestations', 'recap'],
+  vendeur: ['sale', 'history', 'print', 'prestations', 'depenses', 'recap'],
   imprimeur: ['print'],
 };
 
@@ -269,6 +271,7 @@ export default function App() {
     { id: 'history', label: 'Historique', icon: History },
     { id: 'print', label: 'Impression', icon: Printer },
     { id: 'prestations', label: 'Prestations', icon: Briefcase },
+    { id: 'depenses', label: 'Depenses', icon: Receipt },
     { id: 'recap', label: 'Recap Journee', icon: Calendar },
     { id: 'users', label: 'Gestion', icon: Users },
     { id: 'accounting', label: 'Comptabilite', icon: BookOpen },
@@ -413,6 +416,9 @@ export default function App() {
         {activeTab === 'accounting' && <Comptabilite />}
         {activeTab === 'prestations' && userProfile.role === 'vendeur' && (
           <VendeurPrestations currentUser={userProfile} />
+        )}
+        {activeTab === 'depenses' && userProfile.role === 'vendeur' && (
+          <VendeurDepenses />
         )}
         {activeTab === 'recap' && userProfile.role === 'vendeur' && (
           <DailyRecap currentUser={userProfile} />
