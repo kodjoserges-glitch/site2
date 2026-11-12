@@ -14,6 +14,7 @@ import {
   Printer,
   Building2,
   Settings,
+  Trash2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile, UserRole, ROLE_LABELS } from '../types';
@@ -118,6 +119,24 @@ export function UserManagement({ currentUserId, onUpdateCompany }: Props) {
     } catch (err) {
       console.error(err);
       alert("Erreur lors de l'approbation");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function deleteUser(userId: string) {
+    if (!confirm('Supprimer cet utilisateur ? Cette action est definitive et irreversible.')) return;
+    setSaving(userId);
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .delete()
+        .eq('id', userId);
+      if (error) throw error;
+      setProfiles(prev => prev.filter(p => p.id !== userId));
+    } catch (err) {
+      console.error(err);
+      alert('Erreur lors de la suppression');
     } finally {
       setSaving(null);
     }
@@ -369,6 +388,14 @@ export function UserManagement({ currentUserId, onUpdateCompany }: Props) {
                                 Sauvegarder
                               </button>
                             )}
+                            <button
+                              onClick={() => deleteUser(profile.id)}
+                              disabled={saving === profile.id}
+                              className="flex items-center gap-1.5 px-3 py-2 bg-red-600/20 hover:bg-red-600/30 border border-red-600/30 disabled:opacity-50 text-red-400 rounded-lg text-sm font-medium transition-colors"
+                              title="Supprimer l'utilisateur"
+                            >
+                              {saving === profile.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                            </button>
                           </>
                         )}
                       </div>
@@ -404,6 +431,14 @@ export function UserManagement({ currentUserId, onUpdateCompany }: Props) {
                     >
                       {saving === profile.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
                       Reactiver
+                    </button>
+                    <button
+                      onClick={() => deleteUser(profile.id)}
+                      disabled={saving === profile.id}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 border border-red-600/30 disabled:opacity-50 text-red-400 rounded-lg text-xs font-medium transition-colors"
+                      title="Supprimer definitivement"
+                    >
+                      {saving === profile.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
                     </button>
                   </div>
                 ))}
